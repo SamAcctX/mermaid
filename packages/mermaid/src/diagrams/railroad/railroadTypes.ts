@@ -127,6 +127,11 @@ export interface RailroadStyleOptions {
 }
 
 /**
+ * Railroad diagram configuration (alias for RailroadStyleOptions)
+ */
+export type RailroadDiagramConfig = RailroadStyleOptions;
+
+/**
  * Default configuration
  */
 export const DEFAULT_RAILROAD_CONFIG: Required<RailroadStyleOptions> = {
