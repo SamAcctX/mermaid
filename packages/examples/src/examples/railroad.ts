@@ -3,7 +3,8 @@ import type { DiagramMetadata } from '../types.js';
 export default {
   id: 'railroad',
   name: 'Railroad Diagram',
-  description: 'Visualize grammar rules and syntax using railroad diagrams',
+  description:
+    'Visualize grammar rules and syntax using railroad diagrams (also known as syntax diagrams)',
   examples: [
     {
       title: 'Expression Grammar',
