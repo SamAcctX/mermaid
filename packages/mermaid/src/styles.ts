@@ -25,7 +25,7 @@ const getStyles = (
     theme?: string;
     look?: string;
   } & FlowChartStyleOptions,
-  svgId: string
+  svgId: `${string}`
 ) => {
   let diagramStyles = '';
   if (type in themes && themes[type]) {

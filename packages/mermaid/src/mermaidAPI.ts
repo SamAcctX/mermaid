@@ -168,7 +168,8 @@ export const createUserStyles = (
   config: MermaidConfig,
   graphType: string,
   classDefs: Map<string, DiagramStyleClassDef> | undefined,
-  svgId: string
+  // CSS selector for the SVG element, e.g. `#idOfSvgElement`
+  svgId: `#${string}`
 ): string => {
   const userCSSstyles = createCssStyles(config, classDefs);
   const allStyles = getStyles(
@@ -336,7 +337,7 @@ const render = async function (
     text = MAX_TEXTLENGTH_EXCEEDED_MSG;
   }
 
-  const idSelector = '#' + id;
+  const idSelector = `#${id}` as const;
   const iFrameID = 'i' + id;
   const iFrameID_selector = '#' + iFrameID;
   const enclosingDivID = 'd' + id;
