@@ -461,6 +461,21 @@ describe('mermaidAPI', () => {
         '#someId .edge-pattern-dashed{stroke-dasharray:3;}#someId .default{color:red;}#someId .classDef2>*{color:purple;}#someId .classDef2 span{color:purple;}'
       );
     });
+
+    it('should handle `:not(&)` selectors in the CSS', () => {
+      const result = createUserStyles(
+        {
+          ...mockConfig,
+          themeCSS: ':not(&){background:green !important}',
+        },
+        'someDiagram',
+        new Map(),
+        '#someId'
+      );
+      expect(result).toEqual(
+        '#someId .edge-pattern-dashed{stroke-dasharray:3;}#someId :not(#someId){background:green!important;}'
+      );
+    });
   });
 
   describe('removeExistingElements', () => {
