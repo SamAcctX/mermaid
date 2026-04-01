@@ -476,6 +476,34 @@ describe('mermaidAPI', () => {
         '#someId .edge-pattern-dashed{stroke-dasharray:3;}#someId :not(#someId){background:green!important;}'
       );
     });
+
+    it('should remove unsupported at-rules from user CSS', () => {
+      const result = createUserStyles(
+        {
+          ...mockConfig,
+          themeCSS: `
+          @import url('https://example.test/styles.css');
+          @media (max-width: 600px) {
+            * {
+              background-color: lightblue;
+            }
+          }
+          @supports selector(h2 > p) {
+            h2 > p {
+              color: red;
+            }
+          }
+          `,
+        },
+        'someDiagram',
+        new Map(),
+        '#someId'
+      );
+      // @import is removed, but @media and @supports are kept with their child rules namespaced
+      expect(result).toEqual(
+        '#someId .edge-pattern-dashed{stroke-dasharray:3;}@media (max-width: 600px){#someId *{background-color:lightblue;}}@supports selector(h2 > p){#someId h2>p{color:red;}}'
+      );
+    });
   });
 
   describe('removeExistingElements', () => {

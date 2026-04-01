@@ -4,7 +4,18 @@
  */
 // @ts-ignore TODO: Investigate D3 issue
 import { select } from 'd3';
-import { compile, middleware, serialize, stringify } from 'stylis';
+import {
+  COMMENT,
+  compile,
+  KEYFRAMES,
+  LAYER,
+  MEDIA,
+  middleware,
+  SCOPE,
+  serialize,
+  stringify,
+  SUPPORTS,
+} from 'stylis';
 import DOMPurify from 'dompurify';
 import isEmpty from 'lodash-es/isEmpty.js';
 import { addSVGa11yTitleDescription, setA11yDiagramInfo } from './accessibility.js';
@@ -192,7 +203,8 @@ export const createCssStyles = (
  * Use `stylis` to compile the CSS to only apply to the given namespace.
  *
  * This will also remove some newer CSS features (e.g. nesting) to better
- * support older browsers and does some minification.
+ * support older browsers and does some minification. It also removes some
+ * at-rules that can't be namespaced.
  *
  * @internal
  * @param namespace - the namespace to add in front of all the CSS styles, e.g. `#idOfSvgElement`
@@ -225,6 +237,34 @@ const compileCSS = (namespace: `#${string}`, css: string) => {
             }
             return prop;
           });
+        } else if (element.type.startsWith('@')) {
+          // Only allow certain at-rules to avoid namespace escape.
+          //
+          // Nested ones are allowed, since they'd get namespaced appropriately.
+          // @keyframes are required for Mermaid's animation features, even
+          // if they can potentially pollute the page.
+
+          /**
+           * At-rules that contain nested rules.
+           *
+           * @see {@link https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@container}
+           */
+          const nestedAtRules = [
+            MEDIA,
+            SUPPORTS,
+            LAYER,
+            SCOPE,
+            '@container',
+            '@starting-style',
+          ] as const;
+          const allowedAtRules = [
+            ...nestedAtRules,
+            KEYFRAMES, // needed for Mermaid's animation feature
+          ] as const;
+          if (!allowedAtRules.includes(element.type as (typeof allowedAtRules)[number])) {
+            log.warn(`Removing unsupported at-rule ${element.type} from CSS`);
+            element.type = COMMENT;
+          }
         }
       },
       stringify,
