@@ -329,10 +329,13 @@ export const extractor = (graph, depth) => {
       graph.children(node) &&
       graph.children(node).length > 0
     ) {
-      // Always create a dagre subgraph for every subgraph with an explicit direction
+      // Cluster with an explicit direction keyword — always create a subgraph,
+      // even when it has external connections (fixes issue #4648).
       log.warn('Cluster with explicit dir, creating subgraph for children', node, depth);
 
-      const dir = clusterDb.get(node).clusterData.dir;
+      const rawDir = clusterDb.get(node).clusterData.dir;
+      // Normalize TD (top-down alias) to the canonical TB (top-bottom) that dagre expects
+      const dir = rawDir === 'TD' ? 'TB' : rawDir;
       const clusterGraph = new graphlib.Graph({
         multigraph: true,
         compound: true,
@@ -368,12 +371,64 @@ export const extractor = (graph, depth) => {
         node,
         graphlibJson.write(clusterGraph)
       );
+    } else if (
+      !clusterDb.get(node).externalConnections &&
+      graph.children(node) &&
+      graph.children(node).length > 0
+    ) {
+      // Original behaviour: cluster without external connections gets its own sub-graph.
+      log.warn(
+        'Cluster without external connections, without a parent and with children',
+        node,
+        depth
+      );
+
+      const graphSettings = graph.graph();
+      let dir = graphSettings.rankdir === 'TB' ? 'LR' : 'TB';
+      if (clusterDb.get(node)?.clusterData?.dir) {
+        const rawDir = clusterDb.get(node).clusterData.dir;
+        dir = rawDir === 'TD' ? 'TB' : rawDir;
+        log.warn('Fixing dir', clusterDb.get(node).clusterData.dir, dir);
+      }
+
+      const clusterGraph = new graphlib.Graph({
+        multigraph: true,
+        compound: true,
+      })
+        .setGraph({
+          rankdir: dir,
+          nodesep: 50,
+          ranksep: 50,
+          marginx: 8,
+          marginy: 8,
+        })
+        .setDefaultEdgeLabel(function () {
+          return {};
+        });
+
+      const children = graph.children(node);
+      for (const child of children) {
+        copy(child, graph, clusterGraph, child);
+      }
+      const clusterNodeData = graph.node(node) || {};
+      graph.setNode(node, {
+        ...clusterNodeData,
+        clusterNode: true,
+        id: node,
+        clusterData: clusterDb.get(node).clusterData,
+        label: clusterDb.get(node).label,
+        graph: clusterGraph,
+      });
+      log.debug('Old graph after copy', graphlibJson.write(graph));
     } else {
       log.warn(
         'Cluster ** ',
         node,
-        ' **not meeting the criteria (no explicit dir or no children)',
-        clusterDb.get(node)?.clusterData?.dir,
+        ' **not meeting the criteria !externalConnections:',
+        !clusterDb.get(node).externalConnections,
+        ' no parent: ',
+        !graph.parent(node),
+        ' children ',
         graph.children(node) && graph.children(node).length > 0,
         graph.children('D'),
         depth

@@ -700,10 +700,6 @@ You have to call mermaid.initialize.`
     const result = uniq(list.flat());
     const nodeList = result.nodeList;
     let dir = result.dir;
-    // Normalize TD to TB for direction
-    if (dir === 'TD') {
-      dir = 'TB';
-    }
     const flowchartConfig = getConfig().flowchart ?? {};
     dir =
       dir ??
