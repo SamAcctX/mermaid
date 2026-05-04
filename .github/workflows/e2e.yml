@@ -146,7 +146,11 @@ jobs:
                  | node scripts/e2e-diagram-scope.mjs \
                  || echo "")
 
-          if [ -n "$SPEC" ]; then
+          if [ "$SPEC" = "SKIP" ]; then
+            echo "spec_pattern=SKIP" >> "$GITHUB_OUTPUT"
+            echo "matrix=${SCOPED_MATRIX}" >> "$GITHUB_OUTPUT"
+            echo "[detect-scope] Only docs/ignorable files changed — e2e can be skipped."
+          elif [ -n "$SPEC" ]; then
             echo "spec_pattern=${SPEC}" >> "$GITHUB_OUTPUT"
             echo "matrix=${SCOPED_MATRIX}" >> "$GITHUB_OUTPUT"
             echo "[detect-scope] Scoped to: ${SPEC}"
@@ -161,6 +165,8 @@ jobs:
           E2E_SCOPE_BY_DIAGRAM: "${{ vars.E2E_SCOPE_BY_DIAGRAM == 'true' }}"
 
   e2e:
+    # Skip the entire e2e job when only docs/ignorable files changed.
+    if: needs.detect-scope.outputs.spec_pattern != 'SKIP'
     runs-on: ubuntu-latest
     container:
       image: cypress/browsers:node-20.16.0-chrome-127.0.6533.88-1-ff-128.0.3-edge-127.0.2651.74-1
