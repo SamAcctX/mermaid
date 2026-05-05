@@ -188,29 +188,28 @@ mermaid.initialize({
 
 ### Layout tuning (v<MERMAID_RELEASE_VERSION>+)
 
-When sibling services in the same group share similar edge topology — for example, three databases all connecting `B --> T:mcp` — the underlying [fcose](https://github.com/iVis-at-Bilkent/cytoscape.js-fcose) layout has no signal to spread them apart and they may overlap. The following options pass through to the underlying fcose layout so you can adjust it without changing your diagram source:
+The following options pass through to the underlying [fcose](https://github.com/iVis-at-Bilkent/cytoscape.js-fcose) layout so you can adjust spacing and density without changing your diagram source:
 
 | Option                      | Type   | Default | Description                                                                                                                                                                                           |
 | --------------------------- | ------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nodeSeparation`            | number | `75`    | Minimum separation, in pixels, between sibling nodes in the same group. Increase to spread overlapping siblings apart.                                                                                |
+| `nodeSeparation`            | number | `75`    | Minimum separation, in pixels, between sibling nodes in the same group. Pass-through to fcose.                                                                                                        |
 | `idealEdgeLengthMultiplier` | number | `1.5`   | Multiplier applied to `iconSize` to compute the ideal length of edges between nodes within the same group. Increase for breathing room, decrease to pack tighter. Cross-group edges are not affected. |
 | `edgeElasticity`            | number | `0.45`  | Spring elasticity (0–1) on same-group edges. Higher pulls connected nodes closer; lower lets them spread out. Cross-group edges are not affected.                                                     |
 | `numIter`                   | number | `2500`  | Maximum fcose iterations. Increase for higher-quality layouts on large diagrams at the cost of render time.                                                                                           |
 
-Example — bumping `nodeSeparation` to spread three same-port databases:
+Example — bumping `idealEdgeLengthMultiplier` stretches the spacing between connected nodes in a chain:
 
 ```
-%%{init: {"architecture": {"nodeSeparation": 120, "idealEdgeLengthMultiplier": 2}}}%%
+%%{init: {"architecture": {"idealEdgeLengthMultiplier": 3}}}%%
 architecture-beta
-    group api(cloud)[API]
-    service db1(database)[DB1] in api
-    service db2(database)[DB2] in api
-    service db3(database)[DB3] in api
-    service mcp(server)[MCP] in api
-    db1:R --> L:mcp
-    db2:R --> L:mcp
-    db3:R --> L:mcp
+    service a(server)[A]
+    service b(server)[B]
+    service c(server)[C]
+    a:R --> L:b
+    b:R --> L:c
 ```
+
+> **Note:** these knobs tune fcose's force-directed layout; they do not change which nodes the layout heuristic considers adjacent. If two siblings render on top of each other because they share the same logical position in the spatial map (a known limitation tracked in [#6120](https://github.com/mermaid-js/mermaid/issues/6120)), no combination of these knobs will move them apart — see the upcoming `align row|column` directive instead.
 
 ## Icons
 
