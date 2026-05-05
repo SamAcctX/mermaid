@@ -381,6 +381,60 @@ describe('architecture - fcose layout knobs', () => {
   });
 });
 
+describe('architecture - align directive', () => {
+  it('should render three same-port databases without overlap when aligned in a row', () => {
+    imgSnapshotTest(
+      `architecture-beta
+        group api(cloud)[API]
+        service db1(database)[DB1] in api
+        service db2(database)[DB2] in api
+        service db3(database)[DB3] in api
+        service mcp(server)[MCP] in api
+        db1:R --> L:mcp
+        db2:R --> L:mcp
+        db3:R --> L:mcp
+        align row db1 db2 db3
+      `
+    );
+  });
+
+  it('should render aligned siblings in a column', () => {
+    imgSnapshotTest(
+      `architecture-beta
+        service top(server)[Top]
+        service mid(server)[Mid]
+        service bot(server)[Bot]
+        top:B -- T:mid
+        mid:B -- T:bot
+        align column top mid bot
+      `
+    );
+  });
+
+  it('should render a grid via combined row + column alignments', () => {
+    imgSnapshotTest(
+      `architecture-beta
+        group tier1(cloud)[Tier 1]
+            service a1(server)[A1] in tier1
+            service a2(server)[A2] in tier1
+            service a3(server)[A3] in tier1
+        group tier2(database)[Tier 2]
+            service b1(database)[B1] in tier2
+            service b2(database)[B2] in tier2
+            service b3(database)[B3] in tier2
+        a1:B --> T:b1
+        a2:B --> T:b2
+        a3:B --> T:b3
+        align row a1 a2 a3
+        align row b1 b2 b3
+        align column a1 b1
+        align column a2 b2
+        align column a3 b3
+      `
+    );
+  });
+});
+
 describe('architecture - external', () => {
   it('should allow adding external icons', () => {
     urlSnapshotTest('/architecture-external.html');

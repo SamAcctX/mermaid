@@ -125,6 +125,76 @@ creates an edge going out of `groupOne`, adjacent to `server`, and into `groupTw
 
 It's important to note that `groupId`s cannot be used for specifying edges and the `{group}` modifier can only be used for services within a group.
 
+### Aligning siblings (v11.15.0+)
+
+When several services share similar edge topology (for example, three databases all connecting `R --> L:mcp`), the layout heuristic may collapse them onto the same coordinate so that two render on top of each other. The `align` directive declares that a set of services share a row (same y) or a column (same x), and forces them to spread along that axis.
+
+```
+align row {idA} {idB} {idC} ...
+align column {idA} {idB} ...
+```
+
+Members must already be declared as services or junctions, and at least two members are required. Each `align` directive lives on its own line.
+
+```mermaid-example
+architecture-beta
+    group api(cloud)[API]
+    service db1(database)[DB1] in api
+    service db2(database)[DB2] in api
+    service db3(database)[DB3] in api
+    service mcp(server)[MCP] in api
+    db1:R --> L:mcp
+    db2:R --> L:mcp
+    db3:R --> L:mcp
+    align row db1 db2 db3
+```
+
+The order of members in the `align` directive determines their order along the axis. The gap between aligned members is controlled by `idealEdgeLengthMultiplier`.
+
+> **Note:** the declared order must not contradict the directions of edges between the listed members. For example, if the diagram contains `a:L --> R:b` (which places `a` to the right of `b`), then `align row a b` will conflict with that edge direction and the layout engine will fail to render. Use `align row b a` instead, or remove the conflicting edge.
+
+#### Grid layouts (combining `row` and `column`)
+
+`align row` only pins the y-coordinate of its members. To produce a clean grid where columns also align across tiers, pair each `align row` with one or more `align column` directives. The columns can span as many rows as you like — chain every node that should share an x-coordinate, even across groups.
+
+```mermaid-example
+%%{init: {"architecture": {"iconSize": 50, "fontSize": 12}}}%%
+architecture-beta
+    group collection(cloud)[Collection]
+        service ai_pipes(server)[AI Pipelines] in collection
+        service neptune_plat(server)[Neptune Platform] in collection
+        service legacy(server)[Legacy Feeds] in collection
+
+    group cop(database)[Common Operating Picture]
+        service pg_agentic(database)[Postgres Agentic] in cop
+        service clickhouse(database)[ClickHouse] in cop
+        service pg_prod(database)[Postgres Prod] in cop
+
+    group output(disk)[Output]
+        service brief(disk)[Brief] in output
+        service analyst(server)[Analyst] in output
+        service delivery(cloud)[Delivery] in output
+
+    ai_pipes:B --> T:pg_agentic
+    neptune_plat:B --> T:clickhouse
+    legacy:B --> T:pg_prod
+    clickhouse:B --> T:brief
+    brief:R --> L:analyst
+    analyst:R --> L:delivery
+
+    align row ai_pipes neptune_plat legacy
+    align row pg_agentic clickhouse pg_prod
+    align row brief analyst delivery
+
+    align column ai_pipes pg_agentic
+    align column neptune_plat clickhouse brief
+    align column legacy pg_prod
+```
+
+The result is three left-to-right tiers stacked vertically with a straight spine through the middle column. Edges between aligned nodes render as straight horizontal or vertical lines; cross-axis edges (e.g. `pg_agentic:R --> T:mcp_tools`) get a single 90° elbow.
+
+> **Tip:** if a label like `ClickHouse` is too wide to fit on one line at small `iconSize` values, it will wrap at the nearest character boundary. Increase `iconSize` (or use a shorter title) to keep long single-word labels on one line.
+
 ### Junctions
 
 Junctions are a special type of node which acts as a potential 4-way split between edges.

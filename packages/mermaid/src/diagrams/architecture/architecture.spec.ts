@@ -195,6 +195,59 @@ describe('architecture diagrams', () => {
     });
   });
 
+  describe('align directive', () => {
+    it('should parse a row alignment and expose it via getLayoutHints', async () => {
+      const str = `architecture-beta
+  group api(cloud)[API]
+  service db1(database)[DB1] in api
+  service db2(database)[DB2] in api
+  service db3(database)[DB3] in api
+  align row db1 db2 db3`;
+      await expect(parser.parse(str)).resolves.not.toThrow();
+      const hints = db.getLayoutHints();
+      expect(hints).toHaveLength(1);
+      expect(hints[0].direction).toBe('row');
+      expect(hints[0].members).toEqual(['db1', 'db2', 'db3']);
+    });
+
+    it('should parse a column alignment', async () => {
+      const str = `architecture-beta
+  service a(server)[A]
+  service b(server)[B]
+  align column a b`;
+      await expect(parser.parse(str)).resolves.not.toThrow();
+      const hints = db.getLayoutHints();
+      expect(hints).toHaveLength(1);
+      expect(hints[0].direction).toBe('column');
+      expect(hints[0].members).toEqual(['a', 'b']);
+    });
+
+    it('should reject an align directive whose member is not a service or junction', async () => {
+      const str = `architecture-beta
+  service a(server)[A]
+  service b(server)[B]
+  align row a b ghost`;
+      await expect(parser.parse(str)).rejects.toThrow(/ghost/);
+    });
+
+    it('should reject an align directive that lists the same member twice', async () => {
+      const str = `architecture-beta
+  service a(server)[A]
+  align row a a`;
+      await expect(parser.parse(str)).rejects.toThrow(/more than once/);
+    });
+
+    it('should not collide with services whose id starts with row or column', async () => {
+      const str = `architecture-beta
+  service rowspan(server)[Rowspan]
+  service columnar(server)[Columnar]
+  align row rowspan columnar`;
+      await expect(parser.parse(str)).resolves.not.toThrow();
+      expect(db.getServices().map((s) => s.id)).toEqual(['rowspan', 'columnar']);
+      expect(db.getLayoutHints()[0].members).toEqual(['rowspan', 'columnar']);
+    });
+  });
+
   describe('addJunction validation', () => {
     it('should throw if junction id is already in use by a service', () => {
       db.addGroup({ id: 'g1', title: 'Group' });
