@@ -338,6 +338,35 @@ describe('architecture diagram', () => {
   });
 });
 
+describe('architecture - fcose layout knobs', () => {
+  const overlapDiagram = `architecture-beta
+    group api(cloud)[API]
+    service db1(database)[DB1] in api
+    service db2(database)[DB2] in api
+    service db3(database)[DB3] in api
+    service mcp(server)[MCP] in api
+    db1:R --> L:mcp
+    db2:R --> L:mcp
+    db3:R --> L:mcp
+  `;
+
+  it('should render the same-port repro with default fcose knobs', () => {
+    imgSnapshotTest(overlapDiagram);
+  });
+  it('should render with an increased nodeSeparation', () => {
+    imgSnapshotTest(overlapDiagram, { architecture: { nodeSeparation: 150 } });
+  });
+  it('should render with an increased idealEdgeLengthMultiplier', () => {
+    imgSnapshotTest(overlapDiagram, { architecture: { idealEdgeLengthMultiplier: 3 } });
+  });
+  it('should render with a reduced edgeElasticity', () => {
+    imgSnapshotTest(overlapDiagram, { architecture: { edgeElasticity: 0.1 } });
+  });
+  it('should render with a reduced numIter', () => {
+    imgSnapshotTest(overlapDiagram, { architecture: { numIter: 500 } });
+  });
+});
+
 describe('architecture - external', () => {
   it('should allow adding external icons', () => {
     urlSnapshotTest('/architecture-external.html');

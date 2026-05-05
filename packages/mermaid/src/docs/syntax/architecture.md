@@ -186,6 +186,32 @@ mermaid.initialize({
 | ----------- | ------- | ------- | ---------------------------------------------------------------------- |
 | `randomize` | boolean | `false` | Whether to randomize initial node positions before running the layout. |
 
+### Layout tuning (v11.15.0+)
+
+When sibling services in the same group share similar edge topology — for example, three databases all connecting `B --> T:mcp` — the underlying [fcose](https://github.com/iVis-at-Bilkent/cytoscape.js-fcose) layout has no signal to spread them apart and they may overlap. The following options expose fcose tunables so you can adjust the layout without changing your diagram source:
+
+| Option                      | Type   | Default | Description                                                                                                                                                                                           |
+| --------------------------- | ------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nodeSeparation`            | number | `75`    | Minimum separation, in pixels, between sibling nodes in the same group. Increase to spread overlapping siblings apart.                                                                                |
+| `idealEdgeLengthMultiplier` | number | `1.5`   | Multiplier applied to `iconSize` to compute the ideal length of edges between nodes within the same group. Increase for breathing room, decrease to pack tighter. Cross-group edges are not affected. |
+| `edgeElasticity`            | number | `0.45`  | Spring elasticity (0–1) on same-group edges. Higher pulls connected nodes closer; lower lets them spread out. Cross-group edges are not affected.                                                     |
+| `numIter`                   | number | `2500`  | Maximum fcose iterations. Increase for higher-quality layouts on large diagrams at the cost of render time.                                                                                           |
+
+Example — bumping `nodeSeparation` to spread three same-port databases:
+
+```
+%%{init: {"architecture": {"nodeSeparation": 120, "idealEdgeLengthMultiplier": 2}}}%%
+architecture-beta
+    group api(cloud)[API]
+    service db1(database)[DB1] in api
+    service db2(database)[DB2] in api
+    service db3(database)[DB3] in api
+    service mcp(server)[MCP] in api
+    db1:R --> L:mcp
+    db2:R --> L:mcp
+    db3:R --> L:mcp
+```
+
 ## Icons
 
 By default, architecture diagram supports the following icons: `cloud`, `database`, `disk`, `internet`, `server`.
