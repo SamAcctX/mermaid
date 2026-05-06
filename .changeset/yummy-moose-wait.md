@@ -2,4 +2,6 @@
 'mermaid': patch
 ---
 
-fix: updated the parser to only treat comments starting with %%.
+fix(stateDiagram): comments starting with one `%` are no longer treated as comments
+
+Switch to using two `%%` if you want to write a comment.
