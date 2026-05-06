@@ -1,5 +1,4 @@
 ---
-'mermaid': patch
 '@mermaid-js/mermaid-zenuml': patch
 ---
 
