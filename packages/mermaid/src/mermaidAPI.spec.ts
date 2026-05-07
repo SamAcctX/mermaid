@@ -16,22 +16,24 @@ import * as configApi from './config.js';
 // --------------
 // Mocks
 //   To mock a module, first define a mock for it, then (if used explicitly in the tests) import it. Be sure the path points to exactly the same file as is imported in mermaidAPI (the module being tested)
-vi.mock('./styles.js', () => {
+vi.mock(import('./styles.js'), () => {
   return {
     addStylesForDiagram: vi.fn(),
-    default: vi.fn().mockReturnValue(' .userStyle { font-weight:bold; }'),
+    default: vi.fn().mockImplementation(
+      (_type, userStyles, _options) => `
+    & .edge-pattern-dashed{
+      stroke-dasharray: 3;
+    }
+
+    ${userStyles}
+    `
+    ),
   };
 });
 
 import getStyles from './styles.js';
 
-vi.mock('stylis', () => {
-  return {
-    stringify: vi.fn(),
-    compile: vi.fn(),
-    serialize: vi.fn().mockReturnValue('stylis serialized css'),
-  };
-});
+vi.mock(import('stylis'), { spy: true });
 
 import { compile, serialize } from 'stylis';
 import { Diagram } from './Diagram.js';
@@ -423,7 +425,29 @@ describe('mermaidAPI', () => {
       const result = createUserStyles(mockConfig, 'someDiagram', new Map(), 'someId');
       expect(compile).toHaveBeenCalled();
       expect(serialize).toHaveBeenCalled();
-      expect(result).toEqual('stylis serialized css');
+      expect(result).toEqual('someId .edge-pattern-dashed{stroke-dasharray:3;}');
+    });
+
+    it('should sanitize CSS to avoid unbalanced braces', () => {
+      const result = createUserStyles(
+        mockConfig,
+        'someDiagram',
+        new Map(
+          Object.entries({
+            classDef1: {
+              styles: ['}*{ background-image: url("https://example.test")}'],
+              textStyles: [],
+            },
+            classDef2: {
+              styles: ['color: purple;'],
+            },
+          }).map(([id, value]) => [id, { ...value, id }])
+        ),
+        'someId'
+      );
+      expect(result).toEqual(
+        'someId .edge-pattern-dashed{stroke-dasharray:3;}someId .classDef2>*{color:purple;}someId .classDef2 span{color:purple;}'
+      );
     });
   });
 

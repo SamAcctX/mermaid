@@ -25,6 +25,7 @@ import theme from './themes/index.js';
 import type { D3Element, ParseOptions, ParseResult, RenderResult } from './types.js';
 import { decodeEntities } from './utils.js';
 import { toBase64 } from './utils/base64.js';
+import { sanitizeCss } from './utils/sanitizeDirective.js';
 
 const MAX_TEXTLENGTH = 50_000;
 const MAX_TEXTLENGTH_EXCEEDED_MSG =
@@ -96,7 +97,8 @@ export const cssImportantStyles = (
   element: string,
   cssClasses: string[] = []
 ): string => {
-  return `\n.${cssClass} ${element} { ${cssClasses.join(' !important; ')} !important; }`;
+  const declarationBlock = sanitizeCss(`{ ${cssClasses.join(' !important; ')} !important; }`);
+  return `\n.${cssClass} ${element} ${declarationBlock}`;
 };
 
 /**
