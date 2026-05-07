@@ -1,4 +1,4 @@
-// cspell:ignore Hegemann
+// cspell:ignore Hegemann Wybrow
 import { log } from '../../../../logger.js';
 
 const SWIMLANE_DIR_LOG_PREFIX = 'SWIMLANE_DIR';
@@ -190,6 +190,66 @@ export function simplifyDetouredEdges(edges: any[], nodes: any[]): void {
     return undefined;
   };
 
+  const outsideTracks = {
+    top: Math.min(...realNodes.map((node) => node.rect.top)) - ANCHOR,
+    bottom: Math.max(...realNodes.map((node) => node.rect.bottom)) + ANCHOR,
+    left: Math.min(...realNodes.map((node) => node.rect.left)) - ANCHOR,
+    right: Math.max(...realNodes.map((node) => node.rect.right)) + ANCHOR,
+  };
+
+  const buildOrthogonalPathCandidates = (
+    src: { x: number; y: number },
+    srcSide: Side,
+    dst: { x: number; y: number },
+    dstSide: Side
+  ): { x: number; y: number }[][] => {
+    const paths: { x: number; y: number }[][] = [];
+    const base = buildOrthogonalPath(src, srcSide, dst, dstSide);
+    if (base) {
+      paths.push(base);
+    }
+
+    // Crossing-reduction extension of the same-side detour rule above:
+    // when the local "just outside these two ports" track still crosses
+    // an existing connector, also try the corresponding global outer
+    // channel. This mirrors Wybrow-style post-route nudging/ordering:
+    // preserve the port pair and topology class, but move the maximal
+    // middle segment into an uncongested alley if safety checks accept it.
+    if (srcSide === dstSide) {
+      if (srcSide === 'top') {
+        paths.push([
+          src,
+          { x: src.x, y: outsideTracks.top },
+          { x: dst.x, y: outsideTracks.top },
+          dst,
+        ]);
+      } else if (srcSide === 'bottom') {
+        paths.push([
+          src,
+          { x: src.x, y: outsideTracks.bottom },
+          { x: dst.x, y: outsideTracks.bottom },
+          dst,
+        ]);
+      } else if (srcSide === 'left') {
+        paths.push([
+          src,
+          { x: outsideTracks.left, y: src.y },
+          { x: outsideTracks.left, y: dst.y },
+          dst,
+        ]);
+      } else {
+        paths.push([
+          src,
+          { x: outsideTracks.right, y: src.y },
+          { x: outsideTracks.right, y: dst.y },
+          dst,
+        ]);
+      }
+    }
+
+    return paths;
+  };
+
   const pathHitsNode = (pts: { x: number; y: number }[], excludeIds: string[]): boolean => {
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i];
@@ -258,7 +318,11 @@ export function simplifyDetouredEdges(edges: any[], nodes: any[]): void {
       Math.min(Math.max(a1, a2), Math.max(b1, b2)) - Math.max(Math.min(a1, a2), Math.min(b1, b2))
     );
 
-  const pathConflictCount = (path: { x: number; y: number }[], currentEdge: any): number => {
+  const pathConflictCount = (
+    path: { x: number; y: number }[],
+    currentEdge: any,
+    includeIncidentEdges = false
+  ): number => {
     const MIN_SHARED = 8;
     let conflicts = 0;
     const currentStart = (currentEdge as { start?: string }).start;
@@ -270,6 +334,7 @@ export function simplifyDetouredEdges(edges: any[], nodes: any[]): void {
       const otherStart = (other as { start?: string }).start;
       const otherEnd = (other as { end?: string }).end;
       if (
+        !includeIncidentEdges &&
         currentStart &&
         currentEnd &&
         (otherStart === currentStart ||
@@ -432,9 +497,15 @@ export function simplifyDetouredEdges(edges: any[], nodes: any[]): void {
       continue;
     }
     const edgeId = (edge as { id?: string }).id ?? '';
+    const currentCrossingConflicts = pathConflictCount(pts, edge, true);
 
     let bestPath: { x: number; y: number }[] | undefined;
+    let bestCrossingConflicts = currentCrossingConflicts;
     let bestBends = currentBends;
+
+    if (currentBends < BEND_THRESHOLD && currentCrossingConflicts === 0) {
+      continue;
+    }
 
     for (const srcSide of sides) {
       if (faceIsClaimed(srcId, srcSide, edgeId)) {
@@ -446,20 +517,33 @@ export function simplifyDetouredEdges(edges: any[], nodes: any[]): void {
           continue;
         }
         const dstPort = portForSide(dstInfo, dstSide);
-        const path = buildOrthogonalPath(srcPort, srcSide, dstPort, dstSide);
-        if (!path) {
-          continue;
-        }
-        if (pathHitsNode(path, [srcId, dstId])) {
-          continue;
-        }
-        if (pathConflictCount(path, edge) > pathConflictCount(pts, edge)) {
-          continue;
-        }
-        const pathBends = countBends(path);
-        if (pathBends < bestBends) {
-          bestBends = pathBends;
-          bestPath = path;
+        for (const path of buildOrthogonalPathCandidates(srcPort, srcSide, dstPort, dstSide)) {
+          if (pathHitsNode(path, [srcId, dstId])) {
+            continue;
+          }
+
+          const pathBends = countBends(path);
+          if (currentCrossingConflicts > 0) {
+            const pathCrossingConflicts = pathConflictCount(path, edge, true);
+            if (
+              pathCrossingConflicts > bestCrossingConflicts ||
+              (pathCrossingConflicts === bestCrossingConflicts && pathBends >= bestBends)
+            ) {
+              continue;
+            }
+            bestCrossingConflicts = pathCrossingConflicts;
+            bestBends = pathBends;
+            bestPath = path;
+            continue;
+          }
+
+          if (pathConflictCount(path, edge) > pathConflictCount(pts, edge)) {
+            continue;
+          }
+          if (pathBends < bestBends) {
+            bestBends = pathBends;
+            bestPath = path;
+          }
         }
       }
     }

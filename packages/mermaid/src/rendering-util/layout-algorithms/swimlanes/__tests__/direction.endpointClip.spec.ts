@@ -58,4 +58,33 @@ describe('direction endpoint clipping', () => {
       { x: 15, y: 0 },
     ]);
   });
+
+  it('snaps renderer endpoints to the boundary entered by the approach segment', () => {
+    const nodeById = new Map<string, any>([
+      ['A', { id: 'A', x: 0, y: 0, width: 10, height: 10 }],
+      ['B', { id: 'B', x: 40, y: 40, width: 20, height: 20 }],
+    ]);
+    const edges: any[] = [
+      {
+        id: 'A_B',
+        start: 'A',
+        end: 'B',
+        points: [
+          { x: 5, y: 0 },
+          { x: 40, y: 0 },
+          { x: 40, y: 50 },
+        ],
+      },
+    ];
+
+    prepareEdgeEndpointsForRenderer(edges, nodeById);
+
+    expect(edges[0].points).toEqual([
+      { x: 5, y: 0 },
+      { x: 5, y: 0 },
+      { x: 40, y: 0 },
+      { x: 40, y: 30 },
+      { x: 40, y: 30 },
+    ]);
+  });
 });

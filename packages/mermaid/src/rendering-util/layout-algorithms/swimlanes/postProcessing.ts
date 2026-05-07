@@ -13,6 +13,7 @@ import { straightenStalePortOffsets } from './direction/stalePortOffsets.js';
 import { collapseShortTerminalStub } from './direction/terminalStub.js';
 import {
   collapseRedundantRectangularDoglegs,
+  resolveRenderedOrthogonalCrossings,
   separateSharedRenderedTerminalLanes,
 } from './direction/materializedGeometry.js';
 import { simplifyDetouredEdges } from './direction/detourSimplification.js';
@@ -279,7 +280,16 @@ export function postProcessSwimlaneLayout(layout: LayoutData, direction?: string
   // safety checks preserve obstacle clearance and the newly split lanes.
   collapseRedundantRectangularDoglegs(edges, nodeByIdMap);
 
+  // Wybrow-style crossing cleanup for the materialized render geometry. This
+  // pass only activates when strict H/V crossings remain after the lower-level
+  // nudging passes. It tries bounded port-pair and outer-channel candidates,
+  // preserving obstacle clearance and accepting only candidates that reduce the
+  // rendered crossing count.
+  resolveRenderedOrthogonalCrossings(edges, nodeByIdMap);
+
   anchorLabelsToPolyline(edges, nodeByIdMap);
+
+  resolveRenderedOrthogonalCrossings(edges, nodeByIdMap);
 
   prepareEdgeEndpointsForRenderer(edges, nodeByIdMap);
 

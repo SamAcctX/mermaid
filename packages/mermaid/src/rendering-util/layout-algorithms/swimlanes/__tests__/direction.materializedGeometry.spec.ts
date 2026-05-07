@@ -8,7 +8,7 @@ describe('materialized render geometry cleanup', () => {
   it('separates shared visible terminal rails on the same node face', () => {
     const nodeById = new Map<string, any>([
       ['A', { id: 'A', x: -40, y: -30, width: 10, height: 10 }],
-      ['B', { id: 'B', x: 0, y: 0, width: 10, height: 40 }],
+      ['B', { id: 'B', x: 0, y: 0, width: 10, height: 80 }],
     ]);
     const edges: any[] = [
       {
@@ -36,6 +36,39 @@ describe('materialized render geometry cleanup', () => {
     const terminalYs = edges.map((edge) => edge.points.at(-1).y).sort((a, b) => a - b);
     expect(terminalYs[0]).not.toBe(terminalYs[1]);
     expect(terminalYs).toContain(0);
+  });
+
+  it('separates near-parallel terminal rails on the same node face', () => {
+    const nodeById = new Map<string, any>([
+      ['A', { id: 'A', x: -40, y: -30, width: 10, height: 10 }],
+      ['B', { id: 'B', x: 0, y: 0, width: 10, height: 60 }],
+      ['C', { id: 'C', x: -40, y: 30, width: 10, height: 10 }],
+    ]);
+    const edges: any[] = [
+      {
+        id: 'A_B',
+        start: 'A',
+        end: 'B',
+        points: [
+          { x: -90, y: -4 },
+          { x: -5, y: -4 },
+        ],
+      },
+      {
+        id: 'B_C',
+        start: 'B',
+        end: 'C',
+        points: [
+          { x: -5, y: 4 },
+          { x: -90, y: 4 },
+        ],
+      },
+    ];
+
+    separateSharedRenderedTerminalLanes(edges, nodeById);
+
+    const terminalYs = [edges[0].points.at(-1).y, edges[1].points[0].y].sort((a, b) => a - b);
+    expect(terminalYs[1] - terminalYs[0]).toBeGreaterThanOrEqual(16);
   });
 
   it('collapses a provably redundant rectangular dogleg', () => {

@@ -106,10 +106,23 @@ export function clipEdgeEndpointsToNodeBoundaries(edges: unknown[], nodeByIdMap:
   }
 }
 
-function snapEndpointToBoundary(inner: Point, endpoint: Point, r: NodeRect): Point {
+function snapEndpointToBoundary(
+  inner: Point,
+  endpoint: Point,
+  r: NodeRect,
+  useApproachSide = false
+): Point {
   if (Math.abs(inner.y - endpoint.y) < EPS) {
     if (endpoint.y < r.top - EPS || endpoint.y > r.bottom + EPS) {
       return endpoint;
+    }
+    if (useApproachSide) {
+      if (inner.x < r.left - EPS) {
+        return { x: r.left, y: inner.y };
+      }
+      if (inner.x > r.right + EPS) {
+        return { x: r.right, y: inner.y };
+      }
     }
     const toLeft = Math.abs(endpoint.x - r.left) <= Math.abs(endpoint.x - r.right);
     return { x: toLeft ? r.left : r.right, y: inner.y };
@@ -117,6 +130,14 @@ function snapEndpointToBoundary(inner: Point, endpoint: Point, r: NodeRect): Poi
   if (Math.abs(inner.x - endpoint.x) < EPS) {
     if (endpoint.x < r.left - EPS || endpoint.x > r.right + EPS) {
       return endpoint;
+    }
+    if (useApproachSide) {
+      if (inner.y < r.top - EPS) {
+        return { x: inner.x, y: r.top };
+      }
+      if (inner.y > r.bottom + EPS) {
+        return { x: inner.x, y: r.bottom };
+      }
     }
     const toTop = Math.abs(endpoint.y - r.top) <= Math.abs(endpoint.y - r.bottom);
     return { x: inner.x, y: toTop ? r.top : r.bottom };
@@ -204,7 +225,8 @@ function snapAndCollapseEndpoints(
     const snapped = snapEndpointToBoundary(
       firstDistinctAdjacent(next, last, -1),
       next[last],
-      dstRect
+      dstRect,
+      true
     );
     if (snapped !== next[last]) {
       next = [...next.slice(0, last), snapped];
