@@ -5,9 +5,6 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  dagre-d3-es@7.0.14:
-    hash: 9da670a68ec3d17e16b620a8bf8f9ea88df6e8122e728e68caec8eb0cdd9b9d0
-    path: patches/dagre-d3-es@7.0.14.patch
   roughjs:
     hash: 3543d47108cb41b68ec6a671c0e1f9d0cfe2ce524fea5b0992511ae84c3c6b64
     path: patches/roughjs.patch
@@ -267,7 +264,7 @@ importers:
         version: 0.12.3
       dagre-d3-es:
         specifier: 7.0.14
-        version: 7.0.14(patch_hash=9da670a68ec3d17e16b620a8bf8f9ea88df6e8122e728e68caec8eb0cdd9b9d0)
+        version: 7.0.14
       dayjs:
         specifier: ^1.11.19
         version: 1.11.19
@@ -15687,7 +15684,7 @@ snapshots:
       d3-transition: 3.0.1(d3-selection@3.0.0)
       d3-zoom: 3.0.0
 
-  dagre-d3-es@7.0.14(patch_hash=9da670a68ec3d17e16b620a8bf8f9ea88df6e8122e728e68caec8eb0cdd9b9d0):
+  dagre-d3-es@7.0.14:
     dependencies:
       d3: 7.9.0
       lodash-es: 4.18.1

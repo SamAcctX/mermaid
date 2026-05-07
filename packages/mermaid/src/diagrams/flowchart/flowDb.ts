@@ -700,6 +700,10 @@ You have to call mermaid.initialize.`
     const result = uniq(list.flat());
     const nodeList = result.nodeList;
     let dir = result.dir;
+    // Capture whether the user explicitly wrote a direction keyword BEFORE any
+    // TD→TB normalisation or inheritDir override, so that explicitDir is true
+    // only for user-authored direction statements.
+    const hasExplicitDir = dir !== undefined;
     // Normalize TD ("top-down" alias) to the canonical TB ("top-bottom") that dagre expects,
     // mirroring the same normalisation in setDirection() for the top-level graph direction.
     if (dir === 'TD') {
@@ -729,6 +733,7 @@ You have to call mermaid.initialize.`
       title: title.trim(),
       classes: [],
       dir,
+      hasExplicitDir,
       labelType: this.sanitizeNodeLabelType(_title?.type),
     };
 
@@ -1123,7 +1128,7 @@ You have to call mermaid.initialize.`
         cssClasses: subGraph.classes.join(' '),
         shape: 'rect',
         dir: subGraph.dir,
-        explicitDir: !!subGraph.dir, // true only when the user wrote an explicit 'direction X' keyword
+        explicitDir: subGraph.hasExplicitDir, // true only when the user wrote an explicit 'direction X' keyword
         isGroup: true,
         look: config.look,
       });

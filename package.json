@@ -147,8 +147,7 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "roughjs": "patches/roughjs.patch",
-      "dagre-d3-es@7.0.14": "patches/dagre-d3-es@7.0.14.patch"
+      "roughjs": "patches/roughjs.patch"
     },
     "onlyBuiltDependencies": [
       "canvas",
