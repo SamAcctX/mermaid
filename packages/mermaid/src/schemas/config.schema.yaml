@@ -1343,6 +1343,20 @@ $defs: # JSON Schema definition (maybe we should move these to a separate file)
         description: Should show the chart title
         type: boolean
         default: true
+      showLegend:
+        description: Should show a legend for named plots
+        type: boolean
+        default: true
+      legendFontSize:
+        description: Font size of the legend text
+        type: number
+        default: 14
+        minimum: 1
+      legendPadding:
+        description: Padding around the legend
+        type: number
+        default: 10
+        minimum: 0
       xAxis:
         $ref: '#/$defs/XYChartAxisConfig'
         default: { '$ref': '#/$defs/XYChartAxisConfig' }

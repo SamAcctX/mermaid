@@ -9,6 +9,7 @@ export interface XYChartThemeConfig {
   backgroundColor: string;
   titleColor: string;
   dataLabelColor: string;
+  legendTextColor: string;
   xAxisLabelColor: string;
   xAxisTitleColor: string;
   xAxisTickColor: string;
@@ -30,6 +31,7 @@ export type SimplePlotDataType = [string, number][];
 
 export interface LinePlotData {
   type: 'line';
+  title: string;
   strokeFill: string;
   strokeWidth: number;
   data: SimplePlotDataType;
@@ -37,6 +39,7 @@ export interface LinePlotData {
 
 export interface BarPlotData {
   type: 'bar';
+  title: string;
   fill: string;
   data: SimplePlotDataType;
 }
@@ -94,6 +97,9 @@ export interface XYChartConfig {
   titleFontSize: number;
   titlePadding: number;
   showTitle: boolean;
+  showLegend: boolean;
+  legendFontSize: number;
+  legendPadding: number;
   showDataLabel: boolean;
   showDataLabelOutsideBar: boolean;
   xAxis: XYChartAxisConfig;
