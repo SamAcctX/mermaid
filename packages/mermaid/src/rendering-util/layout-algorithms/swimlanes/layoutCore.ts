@@ -1,6 +1,6 @@
 import { log } from '../../../logger.js';
 import type { LayoutData } from '../../types.js';
-import { applySwimlaneDirectionTransform, validateSwimlanesLayout } from './direction.js';
+import { postProcessSwimlaneLayout, validateSwimlanesLayout } from './postProcessing.js';
 import { toGraphView, writeBackToLayoutData } from './helpers.js';
 import { sugiyamaLayout } from './pipeline.js';
 import { routeEdgesOrthogonal as raykovRouting } from './raykovGemini/raykov.js';
@@ -80,7 +80,7 @@ export function runSwimlaneLayoutCore(data4Layout: LayoutData): SwimlaneDirectio
     );
   }
 
-  applySwimlaneDirectionTransform(data4Layout, direction);
+  postProcessSwimlaneLayout(data4Layout, direction);
 
   log.debug(`SWIMLANE_SPACING [${direction}] After direction transform - node positions:`);
   for (const n of contentNodes) {
