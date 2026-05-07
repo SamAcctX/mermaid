@@ -182,9 +182,15 @@ export function preprocessBoxDrawing(input: string): PreprocessResult {
       outputLines.push(indent + content);
       outLineNo++;
       lineMap.set(outLineNo, origLineNo);
-    } else if (ALL_BOX_CHARS.test(normalized)) {
-      // Has box chars but no branch char — decorative, skip
+    } else if (/^[\s─━│┃├┣└┗]+$/.test(normalized)) {
+      // Entire line is box-drawing decoration and whitespace — skip
       continue;
+    } else if (ALL_BOX_CHARS.test(normalized)) {
+      // Has box chars but no branch char — likely content containing a box char (e.g. "Section ─ A.txt")
+      // Treat as root-level item
+      outputLines.push(line);
+      outLineNo++;
+      lineMap.set(outLineNo, origLineNo);
     } else if (/^\s+/.test(normalized)) {
       // Leading whitespace without box chars in box mode → likely mixed format
       throw new Error(
