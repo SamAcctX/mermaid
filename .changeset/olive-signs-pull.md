@@ -2,4 +2,4 @@
 'mermaid': patch
 ---
 
-fix: add support for all arrow types in block diagrams
+fix(block): add support for all arrow types in block diagrams

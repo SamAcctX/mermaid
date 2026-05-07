@@ -2,4 +2,4 @@
 'mermaid': patch
 ---
 
-fix: updated the parser to require a new line boundary before the "end note" keyword to ensure it is only matched when used as an actual note terminator.
+fix(stateDiagram): `end note` now only closes a note when used on a new line
