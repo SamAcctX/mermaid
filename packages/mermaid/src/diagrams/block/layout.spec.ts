@@ -23,7 +23,7 @@ describe('layout runtime config', () => {
   it('should read block.padding from config at call time, not at import time', () => {
     const makeRoot = (): Block => ({
       id: 'root',
-      type: 'rect',
+      type: 'square',
       columns: 2,
       children: [
         { id: 'b1', type: 'rect', children: [], size: { width: 100, height: 50, x: 0, y: 0 } },

@@ -39,7 +39,7 @@ describe('block db runtime config', () => {
   it('should call getConfig at sanitization time, not at module load time', () => {
     const spy = vi.spyOn(diagramAPI, 'getConfig').mockReturnValue({} as any);
 
-    db.setHierarchy([{ id: 'a', type: 'rect', label: 'hello', children: [] }]);
+    db.setHierarchy([{ id: 'a', type: 'square', label: 'hello', children: [] }]);
 
     // getConfig must have been called during setHierarchy (call-time read),
     // not only once at module import time.
