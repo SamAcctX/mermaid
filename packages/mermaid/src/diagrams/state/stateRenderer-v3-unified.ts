@@ -89,7 +89,7 @@ export const draw = async function (text: string, id: string, _version: string, 
         return;
       }
 
-      const allNodes = svg.node()?.querySelectorAll<SVGGElement>('g.node');
+      const allNodes = svg.node()?.querySelectorAll<SVGGElement>('g.node, g.rough-node');
       let matchedElem: SVGGElement | undefined;
 
       allNodes?.forEach((g: SVGGElement) => {
