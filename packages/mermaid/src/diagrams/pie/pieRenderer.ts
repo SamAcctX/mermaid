@@ -64,7 +64,9 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
     .innerRadius(radius * textPosition)
     .outerRadius(radius * textPosition);
 
-  const circle = group
+  const pie = group.append('g');
+
+  pie
     .append('circle')
     .attr('cx', 0)
     .attr('cy', 0)
@@ -102,7 +104,7 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
   ]);
 
   // Build the pie chart: each part of the pie is a path that we build using the arc function.
-  const chart = group
+  pie
     .selectAll('mySlices')
     .data(filteredArcs)
     .enter()
@@ -115,7 +117,7 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
 
   // Now add the section text.
   // Use the centroid method to get the best coordinates.
-  const sectionText = group
+  pie
     .selectAll('mySlices')
     .data(filteredArcs)
     .enter()
@@ -192,6 +194,14 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
     const totalLegendHeight = allSectionData.length * legendHeight;
 
     switch (legendPosition) {
+      case 'center':
+        legend.attr('transform', (_datum, index: number): string => {
+          const offset: number = (legendHeight * allSectionData.length) / 2;
+          const horizontal: number = -longestTextWidth / 2;
+          const vertical: number = index * legendHeight - offset;
+          return 'translate(' + horizontal + ',' + vertical + ')';
+        });
+        break;
       case 'top':
         chartAndLegendHeight += totalLegendHeight;
 
@@ -201,14 +211,8 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
           const vertical: number = index * legendHeight - offset;
           return `translate(${horizontal}, ${vertical})`;
         });
-        circle.attr('transform', (): string => {
+        pie.attr('transform', (): string => {
           return `translate(0, ${totalLegendHeight + legendHeight})`;
-        });
-        chart.attr('transform', (): string => {
-          return `translate(0, ${totalLegendHeight + legendHeight})`;
-        });
-        sectionText.attr('transform', (datum: d3.PieArcDatum<D3Section>): string => {
-          return `translate(${labelArcGenerator.centroid(datum)[0]}, ${labelArcGenerator.centroid(datum)[1] + totalLegendHeight + legendHeight})`;
         });
         break;
       case 'bottom':
@@ -222,7 +226,7 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
         });
         break;
       case 'left':
-        chartAndLegendWidth += LEGEND_RECT_SIZE + LEGEND_SPACING + longestTextWidth;
+        chartAndLegendWidth += longestTextWidth;
 
         legend.attr('transform', (_datum, index: number): string => {
           const offset: number = (legendHeight * allSectionData.length) / 2;
@@ -230,18 +234,12 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
           const vertical: number = index * legendHeight - offset;
           return 'translate(' + horizontal + ',' + vertical + ')';
         });
-        circle.attr('transform', (): string => {
+        pie.attr('transform', (): string => {
           return `translate(${longestTextWidth + legendHeight}, 0)`;
-        });
-        chart.attr('transform', (): string => {
-          return `translate(${longestTextWidth + legendHeight}, 0)`;
-        });
-        sectionText.attr('transform', (datum: d3.PieArcDatum<D3Section>): string => {
-          return `translate(${labelArcGenerator.centroid(datum)[0] + longestTextWidth}, ${labelArcGenerator.centroid(datum)[1]})`;
         });
         break;
       default:
-        chartAndLegendWidth += LEGEND_RECT_SIZE + LEGEND_SPACING + longestTextWidth;
+        chartAndLegendWidth += longestTextWidth;
 
         legend.attr('transform', (_datum, index: number): string => {
           const offset: number = (legendHeight * allSectionData.length) / 2;

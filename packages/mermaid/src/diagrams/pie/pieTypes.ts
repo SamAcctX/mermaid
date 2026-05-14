@@ -32,6 +32,7 @@ export interface PieStyleOptions {
   pieOuterStrokeWidth: string;
   pieOuterStrokeColor: string;
   pieOpacity: string;
+  pieHighlightOnHover: string;
 }
 
 export type Sections = Map<string, number>;
