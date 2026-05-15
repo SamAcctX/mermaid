@@ -86,7 +86,7 @@ const IGNORABLE_PREFIXES = [
   // Doc-related scripts
   'packages/mermaid/scripts/docs',
   // Demos
-  'demos',
+  'demos/',
 ];
 
 // Files ending with these suffixes are ignorable UNLESS they live inside a
