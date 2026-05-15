@@ -1,4 +1,4 @@
-import { select, type Selection } from 'd3';
+import { select } from 'd3';
 import { log } from '../../logger.js';
 import { getConfig } from '../../diagram-api/diagramAPI.js';
 import common from '../common/common.js';
@@ -12,6 +12,7 @@ import {
   setDiagramTitle,
   getDiagramTitle,
 } from '../common/commonDb.js';
+import { createTooltip } from '../common/svgDrawCommon.js';
 import { ClassMember } from './classTypes.js';
 import type {
   ClassRelation,
@@ -26,6 +27,7 @@ import type {
 } from './classTypes.js';
 import type { Node, Edge } from '../../rendering-util/types.js';
 import type { DiagramDB } from '../../diagram-api/types.js';
+import DOMPurify from 'dompurify';
 
 const MERMAID_DOM_ID_PREFIX = 'classId-';
 let classCounter = 0;
@@ -41,6 +43,8 @@ export class ClassDB implements DiagramDB {
   // private static classCounter = 0;
   private namespaces = new Map<string, NamespaceNode>();
   private namespaceCounter = 0;
+  private namespaceStack: string[] = [];
+  private diagramId = '';
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   private functions: Function[] = [];
@@ -53,6 +57,7 @@ export class ClassDB implements DiagramDB {
     this.addRelation = this.addRelation.bind(this);
     this.addClassesToNamespace = this.addClassesToNamespace.bind(this);
     this.addNamespace = this.addNamespace.bind(this);
+    this.popNamespace = this.popNamespace.bind(this);
     this.setCssClass = this.setCssClass.bind(this);
     this.addMembers = this.addMembers.bind(this);
     this.addClass = this.addClass.bind(this);
@@ -142,7 +147,16 @@ export class ClassDB implements DiagramDB {
   }
 
   /**
+   * Sets the diagram's SVG element ID, used to prefix domIds for uniqueness
+   * across multiple diagrams on the same page.
+   */
+  public setDiagramId(svgElementId: string) {
+    this.diagramId = svgElementId;
+  }
+
+  /**
    * Function to lookup domId from id in the graph definition.
+   * When diagramId is set, returns the prefixed version for DOM uniqueness.
    *
    * @param id - class ID to lookup
    * @public
@@ -150,7 +164,8 @@ export class ClassDB implements DiagramDB {
   public lookUpDomId(_id: string): string {
     const id = common.sanitizeText(_id, getConfig());
     if (this.classes.has(id)) {
-      return this.classes.get(id)!.domId;
+      const domId = this.classes.get(id)!.domId;
+      return this.diagramId ? `${this.diagramId}-${domId}` : domId;
     }
     throw new Error('Class not found: ' + id);
   }
@@ -164,6 +179,8 @@ export class ClassDB implements DiagramDB {
     this.functions.push(this.setupToolTips.bind(this));
     this.namespaces = new Map<string, NamespaceNode>();
     this.namespaceCounter = 0;
+    this.namespaceStack = [];
+    this.diagramId = '';
     this.direction = 'TB';
     commonClear();
   }
@@ -428,7 +445,6 @@ export class ClassDB implements DiagramDB {
 
     const id = domId;
     if (this.classes.has(id)) {
-      const elemId = this.lookUpDomId(id);
       let argList: string[] = [];
       if (typeof functionArgs === 'string') {
         /* Splits functionArgs by ',', ignoring all ',' in double quoted strings */
@@ -446,10 +462,11 @@ export class ClassDB implements DiagramDB {
 
       /* if no arguments passed into callback, default to passing in id */
       if (argList.length === 0) {
-        argList.push(elemId);
+        argList.push(id);
       }
 
       this.functions.push(() => {
+        const elemId = this.lookUpDomId(id);
         const elem = document.querySelector(`[id="${elemId}"]`);
         if (elem !== null) {
           elem.addEventListener(
@@ -483,43 +500,45 @@ export class ClassDB implements DiagramDB {
     LOLLIPOP: 4,
   };
 
+  // Utility function to escape HTML meta-characters
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   private readonly setupToolTips = (element: Element) => {
-    let tooltipElem: Selection<HTMLDivElement, unknown, HTMLElement, unknown> =
-      select('.mermaidTooltip');
-    // @ts-expect-error - Incorrect types
-    if ((tooltipElem._groups || tooltipElem)[0][0] === null) {
-      tooltipElem = select('body')
-        .append('div')
-        .attr('class', 'mermaidTooltip')
-        .style('opacity', 0);
-    }
+    const tooltipElem = createTooltip();
 
     const svg = select(element).select('svg');
 
-    const nodes = svg.selectAll('g.node');
+    const nodes = svg.selectAll('g').filter(function () {
+      return select(this).attr('title') !== null;
+    });
+
     nodes
       .on('mouseover', (event: MouseEvent) => {
         const el = select(event.currentTarget as HTMLElement);
         const title = el.attr('title');
-        // Don't try to draw a tooltip if no data is provided
-        if (title === null) {
+        if (!title) {
           return;
         }
-        // @ts-ignore - getBoundingClientRect is not part of the d3 type definition
-        const rect = this.getBoundingClientRect();
 
+        const rect = (event.currentTarget as Element).getBoundingClientRect();
         tooltipElem.transition().duration(200).style('opacity', '.9');
         tooltipElem
-          .text(el.attr('title'))
-          .style('left', window.scrollX + rect.left + (rect.right - rect.left) / 2 + 'px')
-          .style('top', window.scrollY + rect.top - 14 + document.body.scrollTop + 'px');
-        tooltipElem.html(tooltipElem.html().replace(/&lt;br\/&gt;/g, '<br/>'));
+          .html(DOMPurify.sanitize(title))
+          .style('left', `${window.scrollX + rect.left + rect.width / 2}px`)
+          .style('top', `${window.scrollY + rect.bottom + 4}px`);
+
         el.classed('hover', true);
       })
       .on('mouseout', (event: MouseEvent) => {
         tooltipElem.transition().duration(500).style('opacity', 0);
-        const el = select(event.currentTarget as HTMLElement);
-        el.classed('hover', false);
+        select(event.currentTarget as HTMLElement).classed('hover', false);
       });
   };
 
@@ -531,26 +550,92 @@ export class ClassDB implements DiagramDB {
     this.direction = dir;
   }
 
-  /**
-   * Function called by parser when a namespace definition has been found.
-   *
-   * @param id - ID of the namespace to add
-   * @public
-   */
-  public addNamespace(id: string) {
-    if (this.namespaces.has(id)) {
-      return;
-    }
+  private static resolveQualifiedId(id: string, stack: string[]): string {
+    const prefix = stack.at(-1);
+    return prefix ? `${prefix}.${id}` : id;
+  }
 
-    this.namespaces.set(id, {
-      id: id,
+  private static getAncestorIds(qualifiedId: string): string[] {
+    const parts = qualifiedId.split('.');
+    const ids: string[] = new Array(parts.length);
+    ids[0] = parts[0];
+    for (let i = 1; i < parts.length; i++) {
+      ids[i] = `${ids[i - 1]}.${parts[i]}`;
+    }
+    return ids;
+  }
+
+  private createNamespaceNode(
+    id: string,
+    label: string,
+    parentId?: string,
+    explicit = false
+  ): NamespaceNode {
+    return {
+      id,
+      label,
       classes: new Map<string, ClassNode>(),
       notes: new Map<string, ClassNote>(),
       children: new Map<string, NamespaceNode>(),
-      domId: MERMAID_DOM_ID_PREFIX + id + '-' + this.namespaceCounter,
-    });
+      domId: MERMAID_DOM_ID_PREFIX + id + '-' + this.namespaceCounter++,
+      parent: parentId,
+      explicit,
+    };
+  }
 
-    this.namespaceCounter++;
+  private linkParentChild(parentId: string, childId: string) {
+    const parent = this.namespaces.get(parentId);
+    const child = this.namespaces.get(childId);
+    if (!parent || !child) {
+      return;
+    }
+    if (!parent.children.has(childId)) {
+      parent.children.set(childId, child);
+    }
+    child.parent ??= parentId;
+  }
+
+  public addNamespace(id: string, label?: string): string {
+    const qualifiedId = ClassDB.resolveQualifiedId(id, this.namespaceStack);
+    // Push first — grammar guarantees a matching popNamespace in all cases, including re-declarations
+    this.namespaceStack.push(qualifiedId);
+
+    if (this.namespaces.has(qualifiedId)) {
+      const existing = this.namespaces.get(qualifiedId)!;
+      // Re-declaration promotes an auto-created ancestor to explicit
+      existing.explicit = true;
+      if (label) {
+        existing.label = label;
+      }
+      return qualifiedId;
+    }
+
+    const parts = qualifiedId.split('.');
+    const ancestorIds = ClassDB.getAncestorIds(qualifiedId);
+    for (let i = 0; i < ancestorIds.length; i++) {
+      const currentId = ancestorIds[i];
+      const parentId = i > 0 ? ancestorIds[i - 1] : undefined;
+      const isLeaf = i === ancestorIds.length - 1;
+      const nodeLabel = isLeaf && label ? label : parts[i];
+
+      if (!this.namespaces.has(currentId)) {
+        this.namespaces.set(
+          currentId,
+          this.createNamespaceNode(currentId, nodeLabel, parentId, isLeaf)
+        );
+      } else if (isLeaf) {
+        this.namespaces.get(currentId)!.explicit = true;
+      }
+      if (parentId) {
+        this.linkParentChild(parentId, currentId);
+      }
+    }
+
+    return qualifiedId;
+  }
+
+  public popNamespace() {
+    this.namespaceStack.pop();
   }
 
   public getNamespace(name: string): NamespaceNode {
@@ -630,37 +715,66 @@ export class ClassDB implements DiagramDB {
     return marker;
   }
 
+  /**
+   * Walks up the namespace tree from the given id and returns the nearest ancestor
+   * (or the id itself) that is marked as explicit. Used by compact rendering mode
+   * to reassign children to the nearest user-declared namespace.
+   */
+  private resolveExplicitAncestor(id: string | undefined): string | undefined {
+    let current = id;
+    while (current) {
+      const ns = this.namespaces.get(current);
+      if (!ns) {
+        return undefined;
+      }
+      if (ns.explicit) {
+        return current;
+      }
+      current = ns.parent;
+    }
+    return undefined;
+  }
+
   public getData() {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     const config = getConfig();
+    const hierarchical = config.class?.hierarchicalNamespaces ?? true;
 
     for (const namespace of this.namespaces.values()) {
+      if (!hierarchical && !namespace.explicit) {
+        continue;
+      }
       const node: Node = {
         id: namespace.id,
-        label: namespace.id,
+        label: hierarchical ? namespace.label : namespace.id,
         isGroup: true,
         padding: config.class!.padding ?? 16,
         // parent node must be one of [rect, roundedWithTitle, noteGroup, divider]
         shape: 'rect',
         cssStyles: [],
         look: config.look,
+        parentId: hierarchical ? namespace.parent : undefined,
       };
       nodes.push(node);
     }
 
     for (const classNode of this.classes.values()) {
+      const parentId = hierarchical
+        ? classNode.parent
+        : this.resolveExplicitAncestor(classNode.parent);
       const node: Node = {
         ...classNode,
         type: undefined,
         isGroup: false,
-        parentId: classNode.parent,
+        parentId,
         look: config.look,
       };
       nodes.push(node);
     }
 
     for (const note of this.notes.values()) {
+      const noteParentId = hierarchical ? note.parent : this.resolveExplicitAncestor(note.parent);
       const noteNode: Node = {
         id: note.id,
         label: note.text,
@@ -674,7 +788,8 @@ export class ClassDB implements DiagramDB {
           `stroke: ${config.themeVariables.noteBorderColor}`,
         ],
         look: config.look,
-        parentId: note.parent,
+        parentId: noteParentId,
+        labelType: 'markdown',
       };
       nodes.push(noteNode);
 
@@ -737,6 +852,7 @@ export class ClassDB implements DiagramDB {
         style: classRelation.style || '',
         pattern: classRelation.relation.lineType == 1 ? 'dashed' : 'solid',
         look: config.look,
+        labelType: 'markdown',
       };
       edges.push(edge);
     }

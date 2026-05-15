@@ -85,8 +85,7 @@ Use double quotes and backticks "\` text \`" to enclose the markdown text.
 ```mermaid-example
 ---
 config:
-  flowchart:
-    htmlLabels: false
+  htmlLabels: false
 ---
 flowchart LR
     markdown["`This **is** _Markdown_`"]
@@ -99,8 +98,7 @@ flowchart LR
 ```mermaid
 ---
 config:
-  flowchart:
-    htmlLabels: false
+  htmlLabels: false
 ---
 flowchart LR
     markdown["`This **is** _Markdown_`"]
@@ -336,6 +334,7 @@ Below is a comprehensive list of the newly introduced shapes and their correspon
 | Comment with braces on both sides | Curly Braces           | `braces`       | Adds a comment                 |                                                                  |
 | Data Input/Output                 | Lean Right             | `lean-r`       | Represents input or output     | `in-out`, `lean-right`                                           |
 | Data Input/Output                 | Lean Left              | `lean-l`       | Represents output or input     | `lean-left`, `out-in`                                            |
+| Data Store                        | Data Store             | `datastore`    | Data flow diagram data store   | `data-store`                                                     |
 | Database                          | Cylinder               | `cyl`          | Database storage               | `cylinder`, `database`, `db`                                     |
 | Decision                          | Diamond                | `diam`         | Decision-making step           | `decision`, `diamond`, `question`                                |
 | Delay                             | Half-Rounded Rectangle | `delay`        | Represents a delay             | `half-rounded-rectangle`                                         |
@@ -526,6 +525,18 @@ flowchart TD
 ```mermaid
 flowchart TD
     A@{ shape: lean-l, label: "Output/Input" }
+```
+
+### Datastore (Top and bottom border)
+
+```mermaid-example
+flowchart TD
+    A@{ shape: datastore, label: "Datastore" }
+```
+
+```mermaid
+flowchart TD
+    A@{ shape: datastore, label: "Datastore" }
 ```
 
 ### Priority Action (Trapezoid Base Bottom)
@@ -1611,8 +1622,7 @@ The "Markdown Strings" feature enhances flowcharts and mind maps by offering a m
 ```mermaid-example
 ---
 config:
-  flowchart:
-    htmlLabels: false
+  htmlLabels: false
 ---
 flowchart LR
 subgraph "One"
@@ -1628,8 +1638,7 @@ end
 ```mermaid
 ---
 config:
-  flowchart:
-    htmlLabels: false
+  htmlLabels: false
 ---
 flowchart LR
 subgraph "One"
@@ -1760,7 +1769,8 @@ Beginner's tip—a full example using interactive links in a html context:
     };
     const config = {
       startOnLoad: true,
-      flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'cardinal' },
+      htmlLabels: true,
+      flowchart: { useMaxWidth: true, curve: 'cardinal' },
       securityLevel: 'loose',
     };
     mermaid.initialize(config);
@@ -1939,35 +1949,24 @@ flowchart LR
 
 ### CSS classes
 
-It is also possible to predefine classes in CSS styles that can be applied from the graph definition as in the example
-below:
+> **Note:** Applying styles to Mermaid nodes via external CSS (e.g., `.cssClass > rect { fill: ... }`) does **not** work reliably. Mermaid's internal styles are injected with `!important` and scoped to the SVG element ID, giving them higher specificity than external CSS rules. External CSS will be silently overridden.
+>
+> The recommended approach is to use the `classDef` syntax shown in the [Classes](#classes) section above, which works correctly and is the intended styling mechanism.
+>
+> If external CSS is strictly required, every property must use `!important` to override Mermaid's styles — but this is not recommended.
 
-**Example style**
-
-```html
-<style>
-  .cssClass > rect {
-    fill: #ff0000;
-    stroke: #ffff00;
-    stroke-width: 4px;
-  }
-</style>
-```
-
-**Example definition**
+**Working approach — use `classDef` instead:**
 
 ```mermaid-example
 flowchart LR
-    A-->B[AAA<span>BBB</span>]
-    B-->D
-    class A cssClass
+    A:::myStyle --> B
+    classDef myStyle fill:#ff0000,stroke:#ffff00,stroke-width:4px
 ```
 
 ```mermaid
 flowchart LR
-    A-->B[AAA<span>BBB</span>]
-    B-->D
-    class A cssClass
+    A:::myStyle --> B
+    classDef myStyle fill:#ff0000,stroke:#ffff00,stroke-width:4px
 ```
 
 ### Default class
