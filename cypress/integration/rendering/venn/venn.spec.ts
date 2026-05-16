@@ -237,4 +237,29 @@ describe('Venn Diagram', () => {
       { look: 'handDrawn', handDrawnSeed: 1, fontFamily: 'courier' }
     );
   });
+
+  it('17: should render a three-set venn with only a labeled 3-way union (issue #7656)', () => {
+    imgSnapshotTest(
+      `venn-beta
+        title Innovation
+        set Desirable
+        set Feasible
+        set Viable
+        union Desirable, Feasible, Viable["Innovation"]
+      `
+    );
+  });
+
+  it('18: should render a four-set venn with only a 4-way union (issue #7656)', () => {
+    imgSnapshotTest(
+      `venn-beta
+        title Four sets
+        set A
+        set B
+        set C
+        set D
+        union A, B, C, D["AllFour"]
+      `
+    );
+  });
 });

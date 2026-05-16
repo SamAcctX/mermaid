@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { draw } from './vennRenderer.js';
+import { draw, expandImpliedSubsets } from './vennRenderer.js';
 import type { Diagram } from '../../Diagram.js';
+import type { VennData } from './vennTypes.js';
 import * as configModule from '../../config.js';
 
 const createDiagram = (overrides: Partial<Record<string, unknown>> = {}) => {
@@ -162,5 +163,114 @@ describe('vennRenderer', () => {
 
     const debugCircle = document.querySelector('.venn-text-debug-circle');
     expect(debugCircle).not.toBeNull();
+  });
+
+  it('renders label for 3-way union without explicit pairwise unions (issue #7656)', async () => {
+    document.body.innerHTML = '<svg id="venn"></svg>';
+    const diagram = createDiagram({
+      getSubsetData: () => [
+        { sets: ['A'], size: 10, label: undefined },
+        { sets: ['B'], size: 10, label: undefined },
+        { sets: ['C'], size: 10, label: undefined },
+        { sets: ['A', 'B', 'C'], size: 1, label: 'Innovation' },
+      ],
+    });
+
+    await draw('', 'venn', '1.0', diagram);
+
+    const intersectionTexts = [...document.querySelectorAll('.venn-intersection text')];
+    const labels = intersectionTexts.map((el) => el.textContent);
+    expect(labels).toContain('Innovation');
+  });
+});
+
+describe('expandImpliedSubsets', () => {
+  it('returns input unchanged when only singleton and pairwise subsets are present', () => {
+    const input: VennData[] = [
+      { sets: ['A'], size: 10, label: undefined },
+      { sets: ['B'], size: 10, label: undefined },
+      { sets: ['A', 'B'], size: 2.5, label: 'AB' },
+    ];
+    expect(expandImpliedSubsets(input)).toBe(input);
+  });
+
+  it('returns input unchanged when 3-way union has all pairwise unions declared', () => {
+    const input: VennData[] = [
+      { sets: ['A'], size: 10, label: undefined },
+      { sets: ['B'], size: 10, label: undefined },
+      { sets: ['C'], size: 10, label: undefined },
+      { sets: ['A', 'B'], size: 2.5, label: undefined },
+      { sets: ['A', 'C'], size: 2.5, label: undefined },
+      { sets: ['B', 'C'], size: 2.5, label: undefined },
+      { sets: ['A', 'B', 'C'], size: 1, label: 'ABC' },
+    ];
+    const result = expandImpliedSubsets(input);
+    expect(result).toHaveLength(input.length);
+  });
+
+  it('synthesizes missing pairwise subsets for a bare 3-way union', () => {
+    const input: VennData[] = [
+      { sets: ['A'], size: 10, label: undefined },
+      { sets: ['B'], size: 10, label: undefined },
+      { sets: ['C'], size: 10, label: undefined },
+      { sets: ['A', 'B', 'C'], size: 1, label: 'Innovation' },
+    ];
+    const result = expandImpliedSubsets(input);
+    const pairKeys = result
+      .filter((entry) => entry.sets.length === 2)
+      .map((entry) => entry.sets.join('|'))
+      .sort();
+    expect(pairKeys).toEqual(['A|B', 'A|C', 'B|C']);
+  });
+
+  it('preserves user-declared pairwise subsets and only fills in missing ones', () => {
+    const input: VennData[] = [
+      { sets: ['A'], size: 10, label: undefined },
+      { sets: ['B'], size: 10, label: undefined },
+      { sets: ['C'], size: 10, label: undefined },
+      { sets: ['A', 'B'], size: 5, label: 'AB' },
+      { sets: ['A', 'B', 'C'], size: 1, label: 'ABC' },
+    ];
+    const result = expandImpliedSubsets(input);
+
+    const ab = result.find((entry) => entry.sets.join('|') === 'A|B');
+    expect(ab).toEqual({ sets: ['A', 'B'], size: 5, label: 'AB' });
+
+    const synthesized = result
+      .filter((entry) => entry.label === undefined && entry.sets.length === 2)
+      .map((entry) => entry.sets.join('|'))
+      .sort();
+    expect(synthesized).toEqual(['A|C', 'B|C']);
+  });
+
+  it('synthesizes C(N,2) pairs for a bare 4-way union', () => {
+    const input: VennData[] = [
+      { sets: ['A'], size: 10, label: undefined },
+      { sets: ['B'], size: 10, label: undefined },
+      { sets: ['C'], size: 10, label: undefined },
+      { sets: ['D'], size: 10, label: undefined },
+      { sets: ['A', 'B', 'C', 'D'], size: 1, label: 'AllFour' },
+    ];
+    const result = expandImpliedSubsets(input);
+    const pairKeys = result
+      .filter((entry) => entry.sets.length === 2)
+      .map((entry) => entry.sets.join('|'))
+      .sort();
+    expect(pairKeys).toEqual(['A|B', 'A|C', 'A|D', 'B|C', 'B|D', 'C|D']);
+  });
+
+  it('synthesized pairs have a default size and undefined label', () => {
+    const input: VennData[] = [
+      { sets: ['A'], size: 10, label: undefined },
+      { sets: ['B'], size: 10, label: undefined },
+      { sets: ['C'], size: 10, label: undefined },
+      { sets: ['A', 'B', 'C'], size: 1, label: undefined },
+    ];
+    const result = expandImpliedSubsets(input);
+    const synthesized = result.filter((entry) => entry.sets.length === 2);
+    for (const entry of synthesized) {
+      expect(entry.label).toBeUndefined();
+      expect(entry.size).toBeGreaterThan(0);
+    }
   });
 });

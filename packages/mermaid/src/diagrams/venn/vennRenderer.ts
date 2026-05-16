@@ -28,6 +28,35 @@ function buildStyleByKey(styleData: VennStyleData[]): Map<string, Record<string,
   return map;
 }
 
+// venn.js relies on pairwise intersection sizes to lay out overlapping circles.
+// When the user declares only a higher-arity union (e.g. `union A,B,C[label]`)
+// without the underlying pairwise unions, the layout has no overlap constraints
+// and renders the circles disjointly. We synthesize the missing pairwise
+// subsets here so the layout produces the expected overlapping diagram.
+// User-declared subsets are preserved verbatim.
+export function expandImpliedSubsets(subsets: VennData[]): VennData[] {
+  const existingKeys = new Set(subsets.map((s) => s.sets.join('|')));
+  const implied: VennData[] = [];
+  const defaultPairSize = 10 / 4;
+  for (const subset of subsets) {
+    if (subset.sets.length < 3) {
+      continue;
+    }
+    for (let i = 0; i < subset.sets.length; i++) {
+      for (let j = i + 1; j < subset.sets.length; j++) {
+        const pair = [subset.sets[i], subset.sets[j]].sort();
+        const key = pair.join('|');
+        if (existingKeys.has(key)) {
+          continue;
+        }
+        existingKeys.add(key);
+        implied.push({ sets: pair, size: defaultPairSize, label: undefined });
+      }
+    }
+  }
+  return implied.length > 0 ? [...subsets, ...implied] : subsets;
+}
+
 export const draw: DrawDefinition = (
   _text: string,
   id: string,
@@ -49,7 +78,7 @@ export const draw: DrawDefinition = (
     themeVariables.venn8,
   ].filter(Boolean);
   const title = db.getDiagramTitle?.();
-  const sets = db.getSubsetData();
+  const sets = expandImpliedSubsets(db.getSubsetData());
   const textNodes = db.getTextData();
   const styleByKey = buildStyleByKey(db.getStyleData());
 
