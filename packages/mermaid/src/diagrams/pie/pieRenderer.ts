@@ -113,7 +113,10 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
     .attr('fill', (datum: d3.PieArcDatum<D3Section>) => {
       return color(datum.data.label);
     })
-    .attr('class', 'pieCircle');
+    .attr(
+      'class',
+      `pieCircle ${themeVariables.pieHighlightOnHover === true ? 'pieCircleHighlighted' : ''}`
+    );
 
   // Now add the section text.
   // Use the centroid method to get the best coordinates.

@@ -236,7 +236,7 @@ class Theme {
     this.pieOuterStrokeWidth = this.pieOuterStrokeWidth || '2px';
     this.pieOuterStrokeColor = this.pieOuterStrokeColor || 'black';
     this.pieOpacity = this.pieOpacity || '0.7';
-    this.pieHighlightOnHover = this.pieHighlightOnHover === 'true' || false;
+    this.pieHighlightOnHover = this.pieHighlightOnHover || false;
 
     /* venn */
     this.venn1 = this.venn1 ?? adjust(this.primaryColor, { l: -30 });

@@ -271,7 +271,7 @@ class Theme {
     this.pieOuterStrokeWidth = this.pieOuterStrokeWidth || '2px';
     this.pieOuterStrokeColor = this.pieOuterStrokeColor || 'black';
     this.pieOpacity = this.pieOpacity || '0.7';
-    this.pieHighlightOnHover = this.pieHighlightOnHover === 'true' || false;
+    this.pieHighlightOnHover = this.pieHighlightOnHover || false;
 
     /* venn */
     for (let i = 0; i < 8; i++) {
