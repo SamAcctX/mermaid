@@ -9,12 +9,12 @@ const getStyles: DiagramStylesProvider = (options: PieStyleOptions) =>
     opacity : ${options.pieOpacity};
   }
   .pieCircleHighlighted{
-    scale: 1.05;
+    scale: 1.05 !important;
     opacity: 1 !important;
   }
   .pieCircleHighlightedOnHover:hover{
-    transition-duration: 250ms;
-    scale: 1.05;
+    transition-duration: 250ms !important;
+    scale: 1.05 !important;
     opacity: 1 !important;
   }
   .pieOuterCircle{

@@ -1123,7 +1123,7 @@ $defs: # JSON Schema definition (maybe we should move these to a separate file)
         minimum: 0
         maximum: 1
         description: |
-          Donut hole ratio, from 0 for no hole to 1 for only outline.
+          Donut hole ratio. Valid value are from 0 to 0.9. Default to 0.
         default: 0
       legendPosition:
         type: string

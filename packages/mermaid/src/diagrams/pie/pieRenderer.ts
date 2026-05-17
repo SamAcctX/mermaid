@@ -51,7 +51,7 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
   const legendPosition = pieConfig.legendPosition;
 
   const textPosition: number = pieConfig.textPosition;
-  const innerHole: number = pieConfig.donutHole;
+  const innerHole: number = pieConfig.donutHole > 0 && pieConfig.donutHole <= 0.9 ? pieConfig.donutHole : 0;
   const radius: number = Math.min(pieWidth, height) / 2 - MARGIN;
   // Shape helper to build arcs:
   const arcGenerator: d3.Arc<unknown, d3.PieArcDatum<D3Section>> = arc<d3.PieArcDatum<D3Section>>()
@@ -195,7 +195,7 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
     case 'center':
       legend.attr('transform', (_datum, index: number): string => {
         const offset: number = (legendHeight * allSectionData.length) / 2;
-        const horizontal: number = -longestTextWidth / 2 - LEGEND_RECT_SIZE + LEGEND_SPACING;
+        const horizontal: number = -longestTextWidth / 2 - (LEGEND_RECT_SIZE + LEGEND_SPACING);
         const vertical: number = index * legendHeight - offset;
         return 'translate(' + horizontal + ',' + vertical + ')';
       });
@@ -205,7 +205,7 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
 
       legend.attr('transform', (_datum, index: number): string => {
         const offset: number = radius;
-        const horizontal: number = -longestTextWidth / 2;
+        const horizontal: number = -longestTextWidth / 2 - (LEGEND_RECT_SIZE + LEGEND_SPACING);
         const vertical: number = index * legendHeight - offset;
         return `translate(${horizontal}, ${vertical})`;
       });
@@ -218,7 +218,7 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
 
       legend.attr('transform', (_datum, index: number): string => {
         const offset: number = -radius - legendHeight;
-        const horizontal: number = -longestTextWidth / 2;
+        const horizontal: number = -longestTextWidth / 2 - (LEGEND_RECT_SIZE + LEGEND_SPACING);
         const vertical: number = index * legendHeight - offset;
         return 'translate(' + horizontal + ',' + vertical + ')';
       });

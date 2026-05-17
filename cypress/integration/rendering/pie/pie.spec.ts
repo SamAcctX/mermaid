@@ -127,6 +127,29 @@ describe('pie chart', () => {
     );
   });
 
+  it('should render a pie diagram if donutHole parameter is invalid', () => {
+    imgSnapshotTest(
+      `pie title Items Sold
+        "Speaker": 30
+        "Monitor": 8
+        "Keyboard": 5
+        "Mouse": 12
+      `,
+      { pie: { donutHole: 1.2 } }
+    );
+  });
+
+  it('should render a pie diagram if donutHole parameter is invalid', () => {
+    imgSnapshotTest(
+      `pie title Owned Pet
+        "Dog": 65
+        "Cat": 52
+        "Fish": 16
+      `,
+      { pie: { donutHole: -0.3 } }
+    );
+  });
+
   it('should render a pie diagram with legend at the bottom of the diagram', () => {
     imgSnapshotTest(
       `pie title Football Team Member Position

@@ -915,7 +915,7 @@ export interface PieDiagramConfig extends BaseDiagramConfig {
    */
   textPosition?: number;
   /**
-   * Donut hole ratio, from 0 for no hole to 1 for only outline.
+   * Donut hole ratio. Valid value are from 0 to 0.9. Default to 0.
    *
    */
   donutHole?: number;
