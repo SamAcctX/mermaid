@@ -663,7 +663,6 @@ export class StateDB {
 
         tooltipElem.transition().duration(200).style('opacity', '.9');
         tooltipElem
-          .text(title)
           .style('left', window.scrollX + rect.left + (rect.right - rect.left) / 2 + 'px')
           .style('top', window.scrollY + rect.bottom + 'px');
         tooltipElem.html(DOMPurify.sanitize(title));

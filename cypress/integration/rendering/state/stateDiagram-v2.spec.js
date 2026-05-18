@@ -20,6 +20,18 @@ describe('State diagram', () => {
       { logLevel: 0, fontFamily: 'courier' }
     );
   });
+  it('v2 should render click directive tooltips on linked states', () => {
+    renderGraph(
+      `
+    stateDiagram-v2
+    A: Google
+    click A "https://google.com" "Visit Google"
+      `,
+      { securityLevel: 'loose', screenshot: false }
+    );
+
+    cy.get('a[xlink\\:href] > g.node[title="Visit Google"]').should('exist');
+  });
   it('v2 should render a long descriptions instead of id when available', () => {
     imgSnapshotTest(
       `
