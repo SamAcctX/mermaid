@@ -165,7 +165,7 @@ describe('vennRenderer', () => {
     expect(debugCircle).not.toBeNull();
   });
 
-  it('renders label for 3-way union without explicit pairwise unions (issue #7656)', async () => {
+  it('renders an overlapping layout for a bare 3-way union (issue #7656)', async () => {
     document.body.innerHTML = '<svg id="venn"></svg>';
     const diagram = createDiagram({
       getSubsetData: () => [
@@ -178,9 +178,36 @@ describe('vennRenderer', () => {
 
     await draw('', 'venn', '1.0', diagram);
 
-    const intersectionTexts = [...document.querySelectorAll('.venn-intersection text')];
-    const labels = intersectionTexts.map((el) => el.textContent);
-    expect(labels).toContain('Innovation');
+    // The label being present is necessary but not sufficient: venn.js emits a
+    // `.venn-intersection text` element for any declared labeled union, even
+    // when the circles do not actually overlap.
+    const intersectionLabels = [...document.querySelectorAll('.venn-intersection text')].map(
+      (el) => el.textContent
+    );
+    expect(intersectionLabels).toContain('Innovation');
+
+    // What the fix actually guarantees is that the layout produces overlapping
+    // circles, which is visible in two complementary ways in the DOM:
+    //   1. venn.js renders the three implied pairwise intersections, in addition
+    //      to the user-declared 3-way intersection.
+    //   2. The 3-way intersection's SVG path is a real region, not the
+    //      degenerate `"M 0 0"` placeholder venn.js emits when an area has no
+    //      visible geometry on screen.
+    const intersections = [...document.querySelectorAll('.venn-intersection')];
+    const setsByPath = new Map<string, string | null>();
+    for (const node of intersections) {
+      const data = (node as unknown as { __data__?: { sets?: string[] } }).__data__;
+      const sets = data?.sets ?? [];
+      if (sets.length >= 2) {
+        const key = [...sets].sort().join('|');
+        setsByPath.set(key, node.querySelector('path')?.getAttribute('d') ?? null);
+      }
+    }
+    expect([...setsByPath.keys()].sort()).toEqual(['A|B', 'A|B|C', 'A|C', 'B|C']);
+    const threeWayPath = setsByPath.get('A|B|C');
+    expect(threeWayPath).toBeTruthy();
+    expect(threeWayPath).not.toBe('M 0 0');
+    expect((threeWayPath ?? '').length).toBeGreaterThan(20);
   });
 });
 

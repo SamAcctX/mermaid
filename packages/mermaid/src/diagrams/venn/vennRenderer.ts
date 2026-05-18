@@ -34,10 +34,17 @@ function buildStyleByKey(styleData: VennStyleData[]): Map<string, Record<string,
 // and renders the circles disjointly. We synthesize the missing pairwise
 // subsets here so the layout produces the expected overlapping diagram.
 // User-declared subsets are preserved verbatim.
+//
+// Synthesized pairs use the same default size that `vennDB.addSubsetData`
+// would have produced for an undeclared 2-way union, so a bare 3-way union
+// renders identically to one declared with all three pairwise unions left
+// at their defaults. Keep this expression in sync with vennDB.
+const defaultSubsetSize = (arity: number) => 10 / Math.pow(arity, 2);
+
 export function expandImpliedSubsets(subsets: VennData[]): VennData[] {
   const existingKeys = new Set(subsets.map((s) => s.sets.join('|')));
   const implied: VennData[] = [];
-  const defaultPairSize = 10 / 4;
+  const defaultPairSize = defaultSubsetSize(2);
   for (const subset of subsets) {
     if (subset.sets.length < 3) {
       continue;
