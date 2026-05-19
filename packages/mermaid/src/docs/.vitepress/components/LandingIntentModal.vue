@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, type Component } from 'vue';
 import DocsIcon from '~icons/material-symbols/docs-outline-rounded';
-import ChevronIcon from '~icons/material-symbols/chevron-right-rounded';
+import ArrowForwardIcon from '~icons/material-symbols/arrow-forward-rounded';
 import CodeIcon from '~icons/material-symbols/code-blocks-outline';
 import EditIcon from '~icons/material-symbols/rebase-edit-outline-rounded';
 import {
@@ -20,6 +20,7 @@ type LandingOption = {
   description: string;
   cta: string;
   rowClass: string;
+  buttonClass: string;
   icon: Component;
 };
 
@@ -37,7 +38,8 @@ const options: LandingOption[] = [
     title: "Mermaid's full editor",
     description: 'Render existing diagrams or build with AI, code, drag-and-drop, or voice.',
     cta: 'Start free',
-    rowClass: 'border-[#3f3959] shadow-[0_0_0_1px_rgba(63,57,89,0.16)]',
+    rowClass: 'border-[#e80962]',
+    buttonClass: 'bg-[#e80962] text-white group-hover:bg-[#ff1e7a]',
     icon: EditIcon,
   },
   {
@@ -45,15 +47,17 @@ const options: LandingOption[] = [
     title: 'Browse the docs',
     description: 'Mermaid syntax reference, diagram guides, and contributor docs.',
     cta: 'Read docs',
-    rowClass: 'border-[#3f3959] shadow-[0_0_0_1px_rgba(63,57,89,0.16)]',
+    rowClass: 'border-[#2b2542]',
+    buttonClass: 'bg-[#332a54] text-[#ddedf0] group-hover:bg-[#3f3568]',
     icon: DocsIcon,
   },
   {
     choice: 'live-editor',
     title: 'Code in the live editor',
     description: 'Write Mermaid syntax with live preview — no account needed.',
-    cta: 'Mermaid live',
-    rowClass: 'border-[#3f3959] shadow-[0_0_0_1px_rgba(63,57,89,0.16)]',
+    cta: 'Mermaid.live',
+    rowClass: 'border-[#2b2542]',
+    buttonClass: 'bg-[#332a54] text-[#ddedf0] group-hover:bg-[#3f3568]',
     icon: CodeIcon,
   },
 ];
@@ -104,16 +108,13 @@ onMounted(() => {
         <img src="/favicon.svg" alt="Mermaid" class="h-[41px] w-[41px] rounded-[8px]" />
         <div class="h-2 w-px" />
         <h2 class="mt-2 text-2xl font-bold text-white">What are you looking for?</h2>
-        <p class="mt-1 text-xs font-light text-[#f5f5f5]">
-          Choose the right tool for what you need
-        </p>
       </div>
 
       <div class="mt-5 grid gap-3">
         <button
           v-for="option in options"
           :key="option.choice"
-          class="flex items-center gap-3 overflow-hidden rounded-lg border bg-transparent py-[14px] pl-3 pr-2 text-left transition-colors hover:border-[#f84594] hover:bg-[#211c31] hover:shadow-[0_0_0_1px_#f84594]"
+          class="group flex items-center gap-3 overflow-hidden rounded-lg border bg-transparent py-[14px] pl-3 pr-2 text-left transition-colors hover:border-[#f84594] hover:bg-[#211c31] hover:shadow-[0_0_0_1px_#f84594]"
           :class="option.rowClass"
           @click="handleChoice(option.choice)"
         >
@@ -128,14 +129,14 @@ onMounted(() => {
             </p>
           </div>
 
-          <div class="flex shrink-0 items-center gap-3 pl-2">
+          <div class="flex shrink-0 items-center pl-2">
             <span
-              class="rounded-full px-3 py-1 text-xs leading-4 text-white"
-              :class="option.choice === 'full-editor' ? 'bg-[#ff3670]' : 'bg-[#332a54]'"
+              class="inline-flex items-center gap-2 rounded-[12px] px-4 py-2 text-sm font-semibold transition-colors"
+              :class="option.buttonClass"
             >
               {{ option.cta }}
+              <ArrowForwardIcon class="h-4 w-4" />
             </span>
-            <ChevronIcon class="h-[11px] w-[11px] text-[#6b7280]" />
           </div>
         </button>
       </div>
@@ -144,7 +145,7 @@ onMounted(() => {
         <button class="underline" @click="handleChoice('skip')">
           Just exploring, skip for now
         </button>
-        <p class="mt-3">The full editor is part of mermaid.ai. Start free today.</p>
+        <p class="mt-3">The full editor is part of Mermaid.ai. Start free today.</p>
       </div>
     </div>
   </div>
