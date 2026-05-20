@@ -171,7 +171,7 @@ describe('pie chart', () => {
       `,
       { pie: { highlightSlice: 'Food' } }
     );
-    cy.get('.pieCircle').first().should('have.class', 'pieCircleHighlighted');
+    cy.get('.pieCircle').first().should('have.class', 'highlighted');
   });
 
   it('should render a pie diagram that highlights hovered slice', () => {
@@ -183,6 +183,6 @@ describe('pie chart', () => {
       `,
       { pie: { highlightSlice: 'hover' } }
     );
-    cy.get('.pieCircle').first().should('have.class', 'pieCircleHighlightedOnHover');
+    cy.get('.pieCircle').first().should('have.class', 'highlightedOnHover');
   });
 });

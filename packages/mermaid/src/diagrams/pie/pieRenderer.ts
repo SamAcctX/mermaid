@@ -179,14 +179,14 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
       return d.label;
     });
 
-  const longestTextWidth: number = Math.max(
+  const longestTextWidth = Math.max(
     ...legend
       .selectAll('text')
       .nodes()
       .map((node) => (node as Element)?.getBoundingClientRect().width ?? 0)
   );
 
-  let chartAndLegendHeight: number = pieWidth + MARGIN;
+  let chartAndLegendHeight: number = height;
   let chartAndLegendWidth: number = pieWidth + MARGIN;
 
   const legendHeight: number = LEGEND_RECT_SIZE + LEGEND_SPACING;
@@ -260,10 +260,9 @@ export const draw: DrawDefinition = (text, id, _version, diagObj) => {
   const viewBoxX = Math.min(0, titleLeft);
   const viewBoxRight = Math.max(chartAndLegendWidth, titleRight);
   const totalWidth = viewBoxRight - viewBoxX;
-  const totalHeight = Math.max(chartAndLegendHeight, height);
 
-  svg.attr('viewBox', `${viewBoxX} 0 ${totalWidth} ${totalHeight}`);
-  configureSvgSize(svg, totalHeight, totalWidth, pieConfig.useMaxWidth);
+  svg.attr('viewBox', `${viewBoxX} 0 ${totalWidth} ${chartAndLegendHeight}`);
+  configureSvgSize(svg, chartAndLegendHeight, totalWidth, pieConfig.useMaxWidth);
 };
 
 export const renderer = { draw };
