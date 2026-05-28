@@ -1,6 +1,6 @@
 // cspell:ignore Helmers Wybrow
 import type { Edge, Node } from '../../../types.js';
-import { rectFromCenterSize } from './geometry.js';
+import { rectFromCenterSize, segmentBoundsOverlapRect } from './geometry.js';
 import type { RectBounds } from './geometry.js';
 
 const EPS = 1e-3;
@@ -94,18 +94,6 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
     bottom: r.bottom + d,
   });
 
-  const segmentIntersectsRectInterior = (
-    p1: { x: number; y: number },
-    p2: { x: number; y: number },
-    r: RectLite
-  ): boolean => {
-    const segMinX = Math.min(p1.x, p2.x);
-    const segMaxX = Math.max(p1.x, p2.x);
-    const segMinY = Math.min(p1.y, p2.y);
-    const segMaxY = Math.max(p1.y, p2.y);
-    return segMaxX > r.left && segMinX < r.right && segMaxY > r.top && segMinY < r.bottom;
-  };
-
   const labelOverlapsAnything = (labelId: string, edgeId: string, rect: RectLite): boolean => {
     const buffered = inflate(rect, LABEL_PLACEMENT_BUFFER);
     for (const { nodeId, rect: nr } of foreignNodeRects) {
@@ -120,7 +108,7 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
       if (s.edgeId === edgeId) {
         continue;
       }
-      if (segmentIntersectsRectInterior(s.p1, s.p2, buffered)) {
+      if (segmentBoundsOverlapRect(s.p1, s.p2, buffered)) {
         return true;
       }
     }
@@ -137,6 +125,11 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
     }
     return undefined;
   };
+
+  const overlapsPlacedLabel = (labelId: string, rect: RectLite): boolean =>
+    placedLabelRects.some(
+      (placed) => placed.labelId !== labelId && rectsOverlap(rect, placed.rect)
+    );
 
   interface SegmentCandidate {
     idx: number;
@@ -244,17 +237,6 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
     // Wybrow-Marriott alley-midpoint centering (src `e8804c93`), which
     // picks the placement with widest clearance to foreign geometry.
     const ALONG_SEGMENT_TS = [0.5, 0.25, 0.75, 0.15, 0.85];
-    const rectAtT = (
-      seg: SegmentCandidate,
-      pts2: { x: number; y: number }[],
-      t: number
-    ): RectLite => {
-      const a = pts2[seg.idx];
-      const b = pts2[seg.idx + 1];
-      const x = a.x + (b.x - a.x) * t;
-      const y = a.y + (b.y - a.y) * t;
-      return rectFromCenterSize(x, y, lw, lh);
-    };
     const anchorAtT = (seg: SegmentCandidate, t: number): { midX: number; midY: number } => {
       const a = pts[seg.idx];
       const b = pts[seg.idx + 1];
@@ -263,6 +245,10 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
         midY: a.y + (b.y - a.y) * t,
       };
     };
+    const rectAtT = (seg: SegmentCandidate, t: number): RectLite => {
+      const { midX, midY } = anchorAtT(seg, t);
+      return rectFromCenterSize(midX, midY, lw, lh);
+    };
 
     const tryPool = (
       pool: SegmentCandidate[]
@@ -270,16 +256,12 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
       const rankedPool = rankSegments(pool);
       for (const seg of rankedPool) {
         for (const t of ALONG_SEGMENT_TS) {
-          const rect = rectAtT(seg, pts, t);
+          const rect = rectAtT(seg, t);
           const laneId = findContainingLane(rect);
           if (!laneId) {
             continue;
           }
-          if (
-            placedLabelRects.some(
-              (placed) => placed.labelId !== labelId && rectsOverlap(rect, placed.rect)
-            )
-          ) {
+          if (overlapsPlacedLabel(labelId, rect)) {
             continue;
           }
           if (!labelOverlapsAnything(labelId, edge.id, rect)) {
@@ -297,12 +279,7 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
       for (const seg of rankedPool) {
         const rect = rectFromCenterSize(seg.midX, seg.midY, lw, lh);
         const laneId = findContainingLane(rect);
-        if (
-          laneId &&
-          !placedLabelRects.some(
-            (placed) => placed.labelId !== labelId && rectsOverlap(rect, placed.rect)
-          )
-        ) {
+        if (laneId && !overlapsPlacedLabel(labelId, rect)) {
           return { laneId, anchor: { midX: seg.midX, midY: seg.midY } };
         }
       }
