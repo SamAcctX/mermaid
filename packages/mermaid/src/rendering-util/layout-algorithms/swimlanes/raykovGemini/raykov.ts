@@ -731,6 +731,34 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
       return { inside: false };
     };
 
+    const obstacleDetour = (
+      port: Point,
+      node: MermaidNode,
+      opposite: MermaidNode,
+      obs: (typeof obstacles)[0],
+      portIsVertical: boolean
+    ): { x: number; y: number; leavesPositiveSide: boolean } => {
+      if (portIsVertical) {
+        const leavesPositiveSide = port.y > (node.y ?? 0);
+        const goRight = (opposite.x ?? 0) >= port.x;
+        return {
+          x: goRight ? obs.maxX + HORIZONTAL_PIPE_MARGIN : obs.minX - HORIZONTAL_PIPE_MARGIN,
+          y: leavesPositiveSide ? obs.maxY + VERTICAL_PIPE_MARGIN : obs.minY - VERTICAL_PIPE_MARGIN,
+          leavesPositiveSide,
+        };
+      }
+
+      const leavesPositiveSide = port.x > (node.x ?? 0);
+      const goDown = (opposite.y ?? 0) >= port.y;
+      return {
+        x: leavesPositiveSide
+          ? obs.maxX + HORIZONTAL_PIPE_MARGIN
+          : obs.minX - HORIZONTAL_PIPE_MARGIN,
+        y: goDown ? obs.maxY + VERTICAL_PIPE_MARGIN : obs.minY - VERTICAL_PIPE_MARGIN,
+        leavesPositiveSide,
+      };
+    };
+
     // Push source anchor out if it's inside an obstacle
     // This happens when the node below the source is too close
     // When pushed, we also compute waypoints to route around the obstacle
@@ -743,26 +771,14 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
     let srcHandleWaypoints: Point[] = [];
     const srcExcludeIds = [e.start ?? '', e.end ?? ''];
     const srcCheck = isPointInObstacle(pSrcAnchor, srcExcludeIds);
-    // DEBUG: trace the problematic edge
     if (srcCheck.inside && srcCheck.obstacle) {
       const obs = srcCheck.obstacle;
       if (srcPortIsVertical) {
         // Vertical port (top/bottom) - need to route around the obstacle horizontally
-        const isBottom = pSrcPort.y > (src.y ?? 0);
+        const detour = obstacleDetour(pSrcPort, src, dst, obs, true);
 
-        // Choose which side to route around: prefer the side closer to the destination
-        const dstX = dst.x ?? 0;
-        const goRight = dstX >= pSrcPort.x;
-        const detourX = goRight
-          ? obs.maxX + HORIZONTAL_PIPE_MARGIN
-          : obs.minX - HORIZONTAL_PIPE_MARGIN;
-
-        const clearanceY = isBottom
-          ? obs.maxY + VERTICAL_PIPE_MARGIN
-          : obs.minY - VERTICAL_PIPE_MARGIN;
-
-        pSrcAnchor.x = detourX;
-        pSrcAnchor.y = clearanceY;
+        pSrcAnchor.x = detour.x;
+        pSrcAnchor.y = detour.y;
 
         // Strategy: go sideways FIRST to clear the obstacle's x-range, then go down.
         // But we need the FIRST point after port to be orthogonal for insertEdge.
@@ -770,7 +786,7 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         // Compute a small orthogonal step in the gap between the source node and obstacle:
         // - For bottom port going down: step to just before the obstacle's top
         // - This creates an orthogonal segment that insertEdge will preserve
-        const gapY = isBottom
+        const gapY = detour.leavesPositiveSide
           ? Math.min(obs.minY - 2, pSrcPort.y + ANCHOR_OFFSET) // Just before obstacle
           : Math.max(obs.maxY + 2, pSrcPort.y - ANCHOR_OFFSET); // Just after obstacle
 
@@ -780,31 +796,24 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         // 3. Vertical to clearance Y (past obstacle)
         srcHandleWaypoints = [
           { x: pSrcPort.x, y: gapY }, // Orthogonal step in the gap
-          { x: detourX, y: gapY }, // Horizontal detour
-          { x: detourX, y: clearanceY }, // Down past obstacle
+          { x: detour.x, y: gapY }, // Horizontal detour
+          { x: detour.x, y: detour.y }, // Down past obstacle
         ];
       } else {
         // Horizontal port (left/right) - route around vertically
-        const isRight = pSrcPort.x > (src.x ?? 0);
-        const dstY = dst.y ?? 0;
-        const goDown = dstY >= pSrcPort.y;
-        const detourY = goDown ? obs.maxY + VERTICAL_PIPE_MARGIN : obs.minY - VERTICAL_PIPE_MARGIN;
+        const detour = obstacleDetour(pSrcPort, src, dst, obs, false);
 
-        const clearanceX = isRight
-          ? obs.maxX + HORIZONTAL_PIPE_MARGIN
-          : obs.minX - HORIZONTAL_PIPE_MARGIN;
-
-        const gapX = isRight
+        const gapX = detour.leavesPositiveSide
           ? Math.min(obs.minX - 2, pSrcPort.x + ANCHOR_OFFSET)
           : Math.max(obs.maxX + 2, pSrcPort.x - ANCHOR_OFFSET);
 
-        pSrcAnchor.x = clearanceX;
-        pSrcAnchor.y = detourY;
+        pSrcAnchor.x = detour.x;
+        pSrcAnchor.y = detour.y;
 
         srcHandleWaypoints = [
           { x: gapX, y: pSrcPort.y }, // Orthogonal step in the gap
-          { x: gapX, y: detourY }, // Vertical detour
-          { x: clearanceX, y: detourY }, // Horizontal past obstacle
+          { x: gapX, y: detour.y }, // Vertical detour
+          { x: detour.x, y: detour.y }, // Horizontal past obstacle
         ];
       }
     }
@@ -817,43 +826,27 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
     if (dstCheck.inside && dstCheck.obstacle) {
       const obs = dstCheck.obstacle;
       if (dstPortIsVertical) {
-        const isBottom = pDstPort.y > (dst.y ?? 0);
-        const srcX = src.x ?? 0;
-        const goRight = srcX >= pDstPort.x;
-        const detourX = goRight
-          ? obs.maxX + HORIZONTAL_PIPE_MARGIN
-          : obs.minX - HORIZONTAL_PIPE_MARGIN;
+        const detour = obstacleDetour(pDstPort, dst, src, obs, true);
 
-        const clearanceY = isBottom
-          ? obs.maxY + VERTICAL_PIPE_MARGIN
-          : obs.minY - VERTICAL_PIPE_MARGIN;
-
-        pDstAnchor.x = detourX;
-        pDstAnchor.y = clearanceY;
+        pDstAnchor.x = detour.x;
+        pDstAnchor.y = detour.y;
 
         // Waypoints: from anchor -> sideways -> orthogonally to port
         // The LAST waypoint before port MUST have same X as port for orthogonal intersection
         dstHandleWaypoints = [
-          { x: detourX, y: clearanceY }, // From anchor position
-          { x: pDstPort.x, y: clearanceY }, // Go sideways to port's X
+          { x: detour.x, y: detour.y }, // From anchor position
+          { x: pDstPort.x, y: detour.y }, // Go sideways to port's X
           // Then orthogonally to port
         ];
       } else {
-        const isRight = pDstPort.x > (dst.x ?? 0);
-        const srcY = src.y ?? 0;
-        const goDown = srcY >= pDstPort.y;
-        const detourY = goDown ? obs.maxY + VERTICAL_PIPE_MARGIN : obs.minY - VERTICAL_PIPE_MARGIN;
+        const detour = obstacleDetour(pDstPort, dst, src, obs, false);
 
-        const clearanceX = isRight
-          ? obs.maxX + HORIZONTAL_PIPE_MARGIN
-          : obs.minX - HORIZONTAL_PIPE_MARGIN;
-
-        pDstAnchor.x = clearanceX;
-        pDstAnchor.y = detourY;
+        pDstAnchor.x = detour.x;
+        pDstAnchor.y = detour.y;
 
         dstHandleWaypoints = [
-          { x: clearanceX, y: detourY }, // From anchor position
-          { x: clearanceX, y: pDstPort.y }, // Go vertically to port's Y
+          { x: detour.x, y: detour.y }, // From anchor position
+          { x: detour.x, y: pDstPort.y }, // Go vertically to port's Y
         ];
       }
     }
