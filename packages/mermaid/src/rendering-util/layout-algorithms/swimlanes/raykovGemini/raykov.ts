@@ -61,6 +61,13 @@ interface RoutedSegment {
   to: number;
 }
 
+interface RoutedLine {
+  orient: Orientation;
+  coord: number;
+  from: number;
+  to: number;
+}
+
 function chooseOrthogonalSide(
   node: MermaidNode,
   target: Point,
@@ -85,6 +92,12 @@ function chooseOrthogonalSide(
     return dx > 0 ? 'right' : 'left';
   }
   return fallback;
+}
+
+function sharedLineEndpointCoord(line: RoutedLine, nextLine: RoutedLine): number {
+  return Math.abs(line.to - nextLine.from) < EPS || Math.abs(line.to - nextLine.to) < EPS
+    ? line.to
+    : line.from;
 }
 
 // ---------------------------------------------------------------------------
@@ -2206,7 +2219,7 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
       pDstPort = applyPortOffset(pDstPort, side, dstOff);
     }
 
-    const lines = indices.map((idx) => {
+    const lines: RoutedLine[] = indices.map((idx) => {
       const s = allRoutedSegments[idx];
       // const track = s.pipe.tracks[s.trackIndex];
       const coord = segmentCoords.get(`${s.edgeIndex}-${s.segmentIndex}`) ?? s.pipe.coord;
@@ -2232,29 +2245,15 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         if (k < lines.length - 1 && lines[k + 1].orient === 'vertical') {
           const nextLine = lines[k + 1];
           if (Math.abs(line.coord - nextLine.coord) > EPS) {
+            const midY = (prevPt.y + nextLine.from) / 2;
             // Step needed.
-            newPoints.push(
-              {
-                x: line.coord,
-                y: (prevPt.y + (k < lines.length - 1 ? lines[k + 1].from : line.to)) / 2,
-              },
-              {
-                x: nextLine.coord,
-                y: (prevPt.y + (k < lines.length - 1 ? lines[k + 1].from : line.to)) / 2,
-              }
-            );
+            newPoints.push({ x: line.coord, y: midY }, { x: nextLine.coord, y: midY });
           } else {
             // Collinear, same track.
             // Force add vertex if requested (k=0, k=len-2)
             if (k === 0 || k === lines.length - 2) {
               const junctionX = line.coord;
-              // Junction Y?
-              // It's the boundary between segments.
-              // line.to or line.from.
-              const junctionY =
-                Math.abs(line.to - nextLine.from) < EPS || Math.abs(line.to - nextLine.to) < EPS
-                  ? line.to
-                  : line.from;
+              const junctionY = sharedLineEndpointCoord(line, nextLine);
               newPoints.push({ x: junctionX, y: junctionY });
             }
           }
@@ -2273,19 +2272,13 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         if (k < lines.length - 1 && lines[k + 1].orient === 'horizontal') {
           const nextLine = lines[k + 1];
           if (Math.abs(line.coord - nextLine.coord) > EPS) {
-            const junctionX =
-              Math.abs(line.to - nextLine.from) < EPS || Math.abs(line.to - nextLine.to) < EPS
-                ? line.to
-                : line.from;
+            const junctionX = sharedLineEndpointCoord(line, nextLine);
             newPoints.push({ x: junctionX, y: line.coord }, { x: junctionX, y: nextLine.coord });
           } else {
             // Collinear, same track.
             if (k === 0 || k === lines.length - 2) {
               const junctionY = line.coord;
-              const junctionX =
-                Math.abs(line.to - nextLine.from) < EPS || Math.abs(line.to - nextLine.to) < EPS
-                  ? line.to
-                  : line.from;
+              const junctionX = sharedLineEndpointCoord(line, nextLine);
               newPoints.push({ x: junctionX, y: junctionY });
             }
           }
