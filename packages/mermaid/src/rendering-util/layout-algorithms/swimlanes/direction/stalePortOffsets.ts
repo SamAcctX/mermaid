@@ -1,6 +1,12 @@
 // cspell:ignore Hegemann Wolff raykov
 import type { Edge, Node } from '../../../types.js';
-import { classifyThreeSegmentRoute, segmentBoundsOverlapRect } from './geometry.js';
+import {
+  classifyThreeSegmentRoute,
+  collectNodeRectEntries,
+  rectFromCenterSize,
+  segmentBoundsOverlapRect,
+} from './geometry.js';
+import type { Point } from './geometry.js';
 
 const EPS = 1e-3;
 const JOG_MAX = 20; // matches raykov MAX_PORT_SPACING
@@ -8,17 +14,7 @@ const NODE_BUFFER = 3;
 const LABEL_BUFFER = 3;
 const EDGE_BUFFER = 2;
 
-interface PointLite {
-  x: number;
-  y: number;
-}
-
-interface RectLite {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-}
+type PointLite = Point;
 
 interface SegLite {
   edgeId: string;
@@ -48,32 +44,9 @@ interface SegLite {
  * left unchanged.
  */
 export function straightenStalePortOffsets(edges: Edge[], nodeByIdMap: Map<string, Node>): void {
-  // Collect foreign real-node rects (excluding labels and groups).
-  const realNodeRects: { id: string; rect: RectLite }[] = [];
-  const labelRects: { id: string; rect: RectLite }[] = [];
-  for (const n of nodeByIdMap.values()) {
-    if (n.isGroup) {
-      continue;
-    }
-    const cx = n.x ?? 0;
-    const cy = n.y ?? 0;
-    const w = n.width ?? 0;
-    const h = n.height ?? 0;
-    if (w <= 0 || h <= 0) {
-      continue;
-    }
-    const rect: RectLite = {
-      left: cx - w / 2,
-      right: cx + w / 2,
-      top: cy - h / 2,
-      bottom: cy + h / 2,
-    };
-    if (n.isEdgeLabel) {
-      labelRects.push({ id: n.id, rect });
-    } else {
-      realNodeRects.push({ id: n.id, rect });
-    }
-  }
+  const { realNodeRects, labelNodeRects: labelRects } = collectNodeRectEntries(
+    nodeByIdMap.values()
+  );
 
   // Collect all edge segments for edge-on-edge overlap checking.
   const allSegments: SegLite[] = [];
@@ -158,18 +131,18 @@ export function straightenStalePortOffsets(edges: Edge[], nodeByIdMap: Map<strin
     if (!startNode || !endNode) {
       continue;
     }
-    const startRect: RectLite = {
-      left: (startNode.x ?? 0) - (startNode.width ?? 0) / 2,
-      right: (startNode.x ?? 0) + (startNode.width ?? 0) / 2,
-      top: (startNode.y ?? 0) - (startNode.height ?? 0) / 2,
-      bottom: (startNode.y ?? 0) + (startNode.height ?? 0) / 2,
-    };
-    const endRect: RectLite = {
-      left: (endNode.x ?? 0) - (endNode.width ?? 0) / 2,
-      right: (endNode.x ?? 0) + (endNode.width ?? 0) / 2,
-      top: (endNode.y ?? 0) - (endNode.height ?? 0) / 2,
-      bottom: (endNode.y ?? 0) + (endNode.height ?? 0) / 2,
-    };
+    const startRect = rectFromCenterSize(
+      startNode.x ?? 0,
+      startNode.y ?? 0,
+      startNode.width ?? 0,
+      startNode.height ?? 0
+    );
+    const endRect = rectFromCenterSize(
+      endNode.x ?? 0,
+      endNode.y ?? 0,
+      endNode.width ?? 0,
+      endNode.height ?? 0
+    );
 
     // Identify the pattern: H-V-H or V-H-V with a short middle segment.
     const isHVH = route.kind === 'HVH';

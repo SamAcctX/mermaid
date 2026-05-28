@@ -1,33 +1,21 @@
 // cspell:ignore Wybrow Hegemann Gladisch reanchor
 import type { Edge, Node } from '../../../types.js';
 import {
+  collectNodeRectEntries,
   dedupeConsecutivePoints,
   orthogonalSegmentsStrictlyCross as segmentsCross,
   sameX,
   sameY,
   segmentBoundsOverlapRect,
 } from './geometry.js';
+import type { Point, RectBounds } from './geometry.js';
 
 const MIN_CLEARANCE = 20; // Gladisch δ — safety gap
 const EPS = 1e-3;
 const BUFFER = 2;
 
-interface PointLite {
-  x: number;
-  y: number;
-}
-
-interface RectLite {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-}
-
-interface RectEntry {
-  id: string;
-  rect: RectLite;
-}
+type PointLite = Point;
+type RectLite = RectBounds;
 
 function shiftedSegmentsHitRect(
   before: PointLite,
@@ -156,32 +144,8 @@ export function nudgeInteriorVerticalsFromObstacles(
   edges: Edge[],
   nodeByIdMap: Map<string, Node>
 ): void {
-  const realNodeRects: RectEntry[] = [];
-  const labelRects: RectLite[] = [];
-  for (const n of nodeByIdMap.values()) {
-    if (n.isGroup) {
-      continue;
-    }
-    const cx = n.x ?? 0;
-    const cy = n.y ?? 0;
-    const w = n.width ?? 0;
-    const h = n.height ?? 0;
-    if (w <= 0 || h <= 0) {
-      continue;
-    }
-    const rect: RectLite = {
-      left: cx - w / 2,
-      right: cx + w / 2,
-      top: cy - h / 2,
-      bottom: cy + h / 2,
-    };
-    const id = String(n.id ?? '');
-    if (n.isEdgeLabel) {
-      labelRects.push(rect);
-    } else {
-      realNodeRects.push({ id, rect });
-    }
-  }
+  const { realNodeRects, labelNodeRects } = collectNodeRectEntries(nodeByIdMap.values());
+  const labelRects = labelNodeRects.map(({ rect }) => rect);
 
   for (const edge of edges) {
     if (edge.isLayoutOnly) {

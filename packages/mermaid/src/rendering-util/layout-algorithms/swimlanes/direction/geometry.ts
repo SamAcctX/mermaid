@@ -58,6 +58,26 @@ interface SimplifyPassResult {
   changed: boolean;
 }
 
+function nodeBoundsInfoFor(node: NodeBoundsInput): NodeBoundsInfo | undefined {
+  if (node.isGroup) {
+    return undefined;
+  }
+  const cx = node.x ?? 0;
+  const cy = node.y ?? 0;
+  const width = node.width ?? 0;
+  const height = node.height ?? 0;
+  if (width <= 0 || height <= 0) {
+    return undefined;
+  }
+  const id = String(node.id ?? '');
+  return {
+    id,
+    cx,
+    cy,
+    rect: rectFromCenterSize(cx, cy, width, height),
+  };
+}
+
 export function samePoint(a: Point, b: Point, epsilon = EPS): boolean {
   return Math.abs(a.x - b.x) < epsilon && Math.abs(a.y - b.y) < epsilon;
 }
@@ -171,27 +191,38 @@ export function collectRealNodeBounds(nodes: Iterable<NodeBoundsInput>): {
   const nodeInfoById = new Map<string, NodeBoundsInfo>();
   const realNodeRects: RectEntry[] = [];
   for (const node of nodes) {
-    if (node.isGroup || node.isEdgeLabel) {
+    if (node.isEdgeLabel) {
       continue;
     }
-    const cx = node.x ?? 0;
-    const cy = node.y ?? 0;
-    const width = node.width ?? 0;
-    const height = node.height ?? 0;
-    if (width <= 0 || height <= 0) {
+    const info = nodeBoundsInfoFor(node);
+    if (!info) {
       continue;
     }
-    const id = String(node.id ?? '');
-    const info: NodeBoundsInfo = {
-      id,
-      cx,
-      cy,
-      rect: rectFromCenterSize(cx, cy, width, height),
-    };
-    nodeInfoById.set(id, info);
-    realNodeRects.push({ id, rect: info.rect });
+    nodeInfoById.set(info.id, info);
+    realNodeRects.push({ id: info.id, rect: info.rect });
   }
   return { nodeInfoById, realNodeRects };
+}
+
+export function collectNodeRectEntries(nodes: Iterable<NodeBoundsInput>): {
+  realNodeRects: RectEntry[];
+  labelNodeRects: RectEntry[];
+} {
+  const realNodeRects: RectEntry[] = [];
+  const labelNodeRects: RectEntry[] = [];
+  for (const node of nodes) {
+    const info = nodeBoundsInfoFor(node);
+    if (!info) {
+      continue;
+    }
+    const entry = { id: info.id, rect: info.rect };
+    if (node.isEdgeLabel) {
+      labelNodeRects.push(entry);
+    } else {
+      realNodeRects.push(entry);
+    }
+  }
+  return { realNodeRects, labelNodeRects };
 }
 
 export function segmentHitsAnyRect(

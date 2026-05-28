@@ -1,12 +1,13 @@
 import type { Edge, Node } from '../../../types.js';
 import {
+  collectNodeRectEntries,
   dedupeConsecutivePoints,
   overlapLength,
   orthogonalSegmentsForPoints,
   orthogonalSegmentsStrictlyCross,
   segmentBoundsOverlapRect,
 } from './geometry.js';
-import type { OrthogonalSegment, Point, RectBounds } from './geometry.js';
+import type { OrthogonalSegment, Point } from './geometry.js';
 
 export function nudgeSharedInteriorSubpaths(edges: Edge[], nodeByIdMap: Map<string, Node>): void {
   const EPS_LOCAL = 1e-3;
@@ -16,39 +17,15 @@ export function nudgeSharedInteriorSubpaths(edges: Edge[], nodeByIdMap: Map<stri
   const MAX_ITERATIONS = 12;
 
   type PointLite = Point;
-  type RectLite = RectBounds;
 
   interface SegmentLite extends OrthogonalSegment {
     edge: Edge;
     interior: boolean;
   }
 
-  const realNodeRects: { id: string; rect: RectLite }[] = [];
-  const labelRects: { id: string; rect: RectLite }[] = [];
-  for (const n of nodeByIdMap.values()) {
-    if (n.isGroup) {
-      continue;
-    }
-    const cx = n.x ?? 0;
-    const cy = n.y ?? 0;
-    const w = n.width ?? 0;
-    const h = n.height ?? 0;
-    if (w <= 0 || h <= 0) {
-      continue;
-    }
-    const rect: RectLite = {
-      left: cx - w / 2,
-      right: cx + w / 2,
-      top: cy - h / 2,
-      bottom: cy + h / 2,
-    };
-    const id = n.id;
-    if (n.isEdgeLabel) {
-      labelRects.push({ id, rect });
-    } else {
-      realNodeRects.push({ id, rect });
-    }
-  }
+  const { realNodeRects, labelNodeRects: labelRects } = collectNodeRectEntries(
+    nodeByIdMap.values()
+  );
 
   const sameAxisOverlap = (a: SegmentLite, b: SegmentLite): number => {
     if (a.horizontal && b.horizontal && Math.abs(a.a.y - b.a.y) < EPS_LOCAL) {
