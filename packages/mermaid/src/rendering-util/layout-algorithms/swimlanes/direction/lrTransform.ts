@@ -123,10 +123,6 @@ function mirrorAxis(layout: LayoutData, axis: Axis): boolean {
   return true;
 }
 
-function mirrorX(layout: LayoutData): void {
-  mirrorAxis(layout, 'x');
-}
-
 export function applyBtDirectionTransform(layout: LayoutData): boolean {
   const nodes = (layout.nodes ?? []) as LayoutNode[];
   const contentNodes = nodes.filter((node) => !node.isGroup);
@@ -203,7 +199,7 @@ export function applyLrDirectionTransform(
   const laneNodes = nodes.filter((n) => n.isGroup && !n.parentId);
   if (laneNodes.length === 0) {
     if (direction === 'RL') {
-      mirrorX(layout);
+      mirrorAxis(layout, 'x');
     }
     return true;
   }
@@ -306,7 +302,7 @@ export function applyLrDirectionTransform(
   }
 
   if (direction === 'RL') {
-    mirrorX(layout);
+    mirrorAxis(layout, 'x');
   }
 
   return true;
