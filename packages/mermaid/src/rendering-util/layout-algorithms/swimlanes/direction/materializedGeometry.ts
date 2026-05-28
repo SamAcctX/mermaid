@@ -201,9 +201,6 @@ export function separateSharedRenderedTerminalLanes(
     return sameTerminalFace(a, b) && Math.abs(a.coord - b.coord) < MIN_FACE_CLEARANCE;
   };
 
-  const terminalLaneConflict = (a: TerminalLane, b: TerminalLane): boolean =>
-    exactTerminalLaneConflict(a, b) || nearTerminalLaneConflict(a, b);
-
   const shiftedCandidate = (lane: TerminalLane, shift: number): PointLite[] | undefined => {
     const points = dedupeConsecutivePoints((lane.edge as { points?: PointLite[] }).points ?? []);
     if (points.length < 2) {
@@ -289,7 +286,10 @@ export function separateSharedRenderedTerminalLanes(
       for (let j = i + 1; j < lanes.length && !fixed; j++) {
         const first = lanes[i];
         const second = lanes[j];
-        if (first.edge === second.edge || !terminalLaneConflict(first, second)) {
+        if (
+          first.edge === second.edge ||
+          !(exactTerminalLaneConflict(first, second) || nearTerminalLaneConflict(first, second))
+        ) {
           continue;
         }
 
