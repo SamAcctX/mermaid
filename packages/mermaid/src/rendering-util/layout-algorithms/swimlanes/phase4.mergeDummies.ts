@@ -168,36 +168,44 @@ function buildObstacles(
   return obstacles;
 }
 
-function createClearanceCheckers(obstacles: Rect[]) {
-  const clearHorizontal = (y: number, x1: number, x2: number, skip: Set<NodeId>) => {
-    const a = Math.min(x1, x2);
-    const b = Math.max(x1, x2);
-    for (const r of obstacles) {
-      if (skip.has(r.id)) {
-        continue;
-      }
-      if (y >= r.top && y <= r.bottom && !(b <= r.left || a >= r.right)) {
-        return false;
-      }
+function clearHorizontal(
+  obstacles: Rect[],
+  y: number,
+  x1: number,
+  x2: number,
+  skip: Set<NodeId>
+): boolean {
+  const a = Math.min(x1, x2);
+  const b = Math.max(x1, x2);
+  for (const r of obstacles) {
+    if (skip.has(r.id)) {
+      continue;
     }
-    return true;
-  };
-
-  const clearVertical = (x: number, y1: number, y2: number, skip: Set<NodeId>) => {
-    const a = Math.min(y1, y2);
-    const b = Math.max(y1, y2);
-    for (const r of obstacles) {
-      if (skip.has(r.id)) {
-        continue;
-      }
-      if (x >= r.left && x <= r.right && !(b <= r.top || a >= r.bottom)) {
-        return false;
-      }
+    if (y >= r.top && y <= r.bottom && !(b <= r.left || a >= r.right)) {
+      return false;
     }
-    return true;
-  };
+  }
+  return true;
+}
 
-  return { clearHorizontal, clearVertical };
+function clearVertical(
+  obstacles: Rect[],
+  x: number,
+  y1: number,
+  y2: number,
+  skip: Set<NodeId>
+): boolean {
+  const a = Math.min(y1, y2);
+  const b = Math.max(y1, y2);
+  for (const r of obstacles) {
+    if (skip.has(r.id)) {
+      continue;
+    }
+    if (x >= r.left && x <= r.right && !(b <= r.top || a >= r.bottom)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function occupies(intervals: Interval[], a: number, b: number): boolean {
@@ -326,7 +334,6 @@ export function mergeDummies(
     corridorUtils;
 
   const obstacles = buildObstacles(out, accessors);
-  const { clearHorizontal, clearVertical } = createClearanceCheckers(obstacles);
 
   const trackAllocator = createTrackAllocator(EDGE_GAP);
   const {
@@ -399,7 +406,7 @@ export function mergeDummies(
     const skip = new Set<NodeId>([src, dst]);
     if (
       Math.abs(sy - ty) < 1e-6 &&
-      clearHorizontal(sy, sx, tx, skip) &&
+      clearHorizontal(obstacles, sy, sx, tx, skip) &&
       canReserveHorizontal(sy, sx, tx)
     ) {
       reserveHorizontal(sy, sx, tx);
@@ -409,7 +416,7 @@ export function mergeDummies(
     }
     if (
       Math.abs(sx - tx) < 1e-6 &&
-      clearVertical(sx, sy, ty, skip) &&
+      clearVertical(obstacles, sx, sy, ty, skip) &&
       canReserveVertical(sx, sy, ty)
     ) {
       reserveVertical(sx, sy, ty);
