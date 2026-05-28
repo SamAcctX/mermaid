@@ -12,15 +12,6 @@ export const EDGE_ROUTING = {
 
   /** Horizontal offset from lane boundary to corridor center (px) */
   LANE_MARGIN: 20,
-
-  /** Clearance margin around obstacles for pathfinding (px) */
-  CLEARANCE: 12,
-
-  /** Maximum number of track positions to search before fallback */
-  MAX_TRACK_SEARCH: 8,
-
-  /** Fallback track offset when max search is exceeded */
-  FALLBACK_TRACK_OFFSET: 9,
 } as const;
 
 /**
@@ -29,15 +20,6 @@ export const EDGE_ROUTING = {
 export const PRECISION = {
   /** Epsilon for floating-point comparisons */
   EPSILON: 1e-6,
-
-  /** Decimal places for coordinate rounding in track keys */
-  COORD_PRECISION: 1,
-
-  /** Decimal places for fine-grained coordinate keys */
-  FINE_COORD_PRECISION: 3,
-
-  /** Decimal places for interval keys */
-  INTERVAL_KEY_PRECISION: 2,
 } as const;
 
 /**
