@@ -9,6 +9,7 @@ import {
   orthogonalSegmentsForPoints,
   orthogonalSegmentsStrictlyCross,
   portForRectSide,
+  rectFromCenterSize,
   segmentBoundsOverlapRect,
 } from './geometry.js';
 import type { OrthogonalSegment, Point, RectBounds, RectSide } from './geometry.js';
@@ -29,7 +30,7 @@ const rectOfNode = (node: any): RectLite | undefined => {
   if (w <= 0 || h <= 0) {
     return undefined;
   }
-  return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2 };
+  return rectFromCenterSize(cx, cy, w, h);
 };
 
 const sameAxisOverlap = (a: SegmentLite, b: SegmentLite): number => {

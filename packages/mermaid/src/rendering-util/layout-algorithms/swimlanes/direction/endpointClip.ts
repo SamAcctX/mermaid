@@ -1,19 +1,10 @@
-import { orthogonalizePolyline, simplifyPolyline } from './geometry.js';
+import { orthogonalizePolyline, rectFromCenterSize, simplifyPolyline } from './geometry.js';
+import type { Point, RectBounds } from './geometry.js';
 
 const EPS = 1e-3;
 const INSIDE_EPS = 0.5;
 
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface NodeRect {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-}
+type NodeRect = RectBounds;
 
 type BorderSide = 'top' | 'bottom' | 'left' | 'right';
 
@@ -25,7 +16,7 @@ function rectOfNode(node: any): NodeRect | undefined {
   if (w <= 0 || h <= 0) {
     return undefined;
   }
-  return { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2 };
+  return rectFromCenterSize(cx, cy, w, h);
 }
 
 function strictlyInside(p: Point, r: NodeRect): boolean {

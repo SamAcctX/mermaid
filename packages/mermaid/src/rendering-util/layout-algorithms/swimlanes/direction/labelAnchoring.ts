@@ -1,5 +1,7 @@
 // cspell:ignore Helmers Wybrow
 import type { Edge, Node } from '../../../types.js';
+import { rectFromCenterSize } from './geometry.js';
+import type { RectBounds } from './geometry.js';
 
 const EPS = 1e-3;
 
@@ -7,12 +9,7 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
   // Build a set of foreign polylines once for overlap checks. Labelled
   // originals that haven't been anchored yet are still included — their
   // polylines exist, even if their labels haven't moved.
-  interface RectLite {
-    left: number;
-    right: number;
-    top: number;
-    bottom: number;
-  }
+  type RectLite = RectBounds;
   interface SegmentLite {
     edgeId: string;
     p1: { x: number; y: number };
@@ -49,7 +46,7 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
       if (w > 0 && h > 0) {
         laneGroups.push({
           id: n.id,
-          rect: { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2 },
+          rect: rectFromCenterSize(cx, cy, w, h),
         });
       }
       continue;
@@ -69,7 +66,7 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
     }
     foreignNodeRects.push({
       nodeId: n.id,
-      rect: { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2 },
+      rect: rectFromCenterSize(cx, cy, w, h),
     });
   }
 
@@ -256,12 +253,7 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
       const b = pts2[seg.idx + 1];
       const x = a.x + (b.x - a.x) * t;
       const y = a.y + (b.y - a.y) * t;
-      return {
-        left: x - lw / 2,
-        right: x + lw / 2,
-        top: y - lh / 2,
-        bottom: y + lh / 2,
-      };
+      return rectFromCenterSize(x, y, lw, lh);
     };
     const anchorAtT = (seg: SegmentCandidate, t: number): { midX: number; midY: number } => {
       const a = pts[seg.idx];
@@ -303,12 +295,7 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
     ): { laneId: string; anchor: { midX: number; midY: number } } | undefined => {
       const rankedPool = rankSegments(pool);
       for (const seg of rankedPool) {
-        const rect: RectLite = {
-          left: seg.midX - lw / 2,
-          right: seg.midX + lw / 2,
-          top: seg.midY - lh / 2,
-          bottom: seg.midY + lh / 2,
-        };
+        const rect = rectFromCenterSize(seg.midX, seg.midY, lw, lh);
         const laneId = findContainingLane(rect);
         if (
           laneId &&
@@ -331,12 +318,7 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
       labelNode.x = chosen.anchor.midX;
       labelNode.y = chosen.anchor.midY;
       labelNode.parentId = chosen.laneId;
-      const chosenRect = {
-        left: chosen.anchor.midX - lw / 2,
-        right: chosen.anchor.midX + lw / 2,
-        top: chosen.anchor.midY - lh / 2,
-        bottom: chosen.anchor.midY + lh / 2,
-      };
+      const chosenRect = rectFromCenterSize(chosen.anchor.midX, chosen.anchor.midY, lw, lh);
       const priorIdx = placedLabelRects.findIndex((placed) => placed.labelId === labelId);
       if (priorIdx >= 0) {
         placedLabelRects[priorIdx] = { labelId, rect: chosenRect };
