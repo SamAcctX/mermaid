@@ -22,6 +22,15 @@ export interface NodeBoundsInfo extends RectEntry {
   cy: number;
 }
 
+export interface NodePairGeometry {
+  srcId: string;
+  dstId: string;
+  srcInfo: NodeBoundsInfo;
+  dstInfo: NodeBoundsInfo;
+  collinearX: boolean;
+  collinearY: boolean;
+}
+
 export interface ThreeSegmentRoute {
   kind: 'HVH' | 'VHV';
   p0: Point;
@@ -51,6 +60,11 @@ interface NodeBoundsInput {
   height?: number;
   isGroup?: boolean;
   isEdgeLabel?: boolean;
+}
+
+interface EdgeEndpointInput {
+  start?: string;
+  end?: string;
 }
 
 interface SimplifyPassResult {
@@ -223,6 +237,31 @@ export function collectNodeRectEntries(nodes: Iterable<NodeBoundsInput>): {
     }
   }
   return { realNodeRects, labelNodeRects };
+}
+
+export function getNodePairGeometry(
+  edge: EdgeEndpointInput,
+  nodeInfoById: Map<string, NodeBoundsInfo>,
+  epsilon = EPS
+): NodePairGeometry | undefined {
+  const srcId = edge.start;
+  const dstId = edge.end;
+  if (!srcId || !dstId) {
+    return undefined;
+  }
+  const srcInfo = nodeInfoById.get(srcId);
+  const dstInfo = nodeInfoById.get(dstId);
+  if (!srcInfo || !dstInfo) {
+    return undefined;
+  }
+  return {
+    srcId,
+    dstId,
+    srcInfo,
+    dstInfo,
+    collinearX: Math.abs(srcInfo.cx - dstInfo.cx) < epsilon,
+    collinearY: Math.abs(srcInfo.cy - dstInfo.cy) < epsilon,
+  };
 }
 
 export function segmentHitsAnyRect(

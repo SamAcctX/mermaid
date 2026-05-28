@@ -4,6 +4,7 @@ import {
   classifyThreeSegmentRoute,
   collectRealNodeBounds,
   dedupeConsecutivePoints,
+  getNodePairGeometry,
   segmentConflictsWithAnyEdge,
   segmentHitsAnyRect,
 } from './geometry.js';
@@ -126,20 +127,13 @@ export function portSwapToLShape(edges: Edge[], nodes: Node[]): void {
     const { p3 } = route;
     const isHVH = route.kind === 'HVH';
 
-    const srcId = edge.start;
-    const dstId = edge.end;
-    if (!srcId || !dstId) {
+    const nodePair = getNodePairGeometry(edge, nodeInfoById, EPS);
+    if (!nodePair) {
       continue;
     }
-    const srcInfo = nodeInfoById.get(srcId);
-    const dstInfo = nodeInfoById.get(dstId);
-    if (!srcInfo || !dstInfo) {
-      continue;
-    }
+    const { srcId, dstId, srcInfo, dstInfo, collinearX, collinearY } = nodePair;
 
     // Skip collinear src/dst — straightenCollinearSiblingDetours handles those.
-    const collinearX = Math.abs(srcInfo.cx - dstInfo.cx) < EPS;
-    const collinearY = Math.abs(srcInfo.cy - dstInfo.cy) < EPS;
     if (collinearX || collinearY) {
       continue;
     }

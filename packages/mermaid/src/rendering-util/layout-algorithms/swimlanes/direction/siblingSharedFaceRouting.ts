@@ -3,6 +3,7 @@ import type { Edge, Node } from '../../../types.js';
 import {
   classifyThreeSegmentRoute,
   collectRealNodeBounds,
+  getNodePairGeometry,
   segmentConflictsWithAnyEdge,
   segmentHitsAnyRect,
 } from './geometry.js';
@@ -117,19 +118,11 @@ export function straightenCollinearSiblingDetours(edges: Edge[], nodes: Node[]):
       continue;
     }
 
-    const srcId = edge.start;
-    const dstId = edge.end;
-    if (!srcId || !dstId) {
+    const nodePair = getNodePairGeometry(edge, nodeInfoById, EPS);
+    if (!nodePair) {
       continue;
     }
-    const srcInfo = nodeInfoById.get(srcId);
-    const dstInfo = nodeInfoById.get(dstId);
-    if (!srcInfo || !dstInfo) {
-      continue;
-    }
-
-    const collinearX = Math.abs(srcInfo.cx - dstInfo.cx) < EPS;
-    const collinearY = Math.abs(srcInfo.cy - dstInfo.cy) < EPS;
+    const { srcId, dstId, srcInfo, dstInfo, collinearX, collinearY } = nodePair;
     if (collinearX === collinearY) {
       continue;
     }
