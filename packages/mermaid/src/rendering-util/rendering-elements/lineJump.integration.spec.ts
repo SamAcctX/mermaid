@@ -24,6 +24,8 @@ import { applySwimlaneDirectionTransform } from '../layout-algorithms/swimlanes/
 import { createEdgeLabelNodes } from '../layout-algorithms/swimlanes/edgeLabelNodes.js';
 import { findEdgeIntersections, type EdgeGeom } from './lineJump.js';
 
+const DEBUG = process.env.SWIMLANE_DDLT_DEBUG === '1';
+
 interface FixtureNode {
   id: string;
   width: number;
@@ -175,7 +177,7 @@ describe('lineJump integration — 7-car-sales-constr swimlane fixture', () => {
         '[lineJump.integration] no crossings found in fixture. Edge geoms:',
         JSON.stringify(edgeGeoms, null, 2)
       );
-    } else {
+    } else if (DEBUG) {
       console.log(
         `[lineJump.integration] found ${crossings.length} crossing(s):`,
         crossings.map((c) => ({
