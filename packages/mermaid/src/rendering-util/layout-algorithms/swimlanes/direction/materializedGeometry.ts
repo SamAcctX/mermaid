@@ -37,10 +37,10 @@ const rectOfNode = (node: any): RectLite | undefined => {
 };
 
 const sameAxisOverlap = (a: SegmentLite, b: SegmentLite): number => {
-  if (a.horizontal && b.horizontal && Math.abs(a.a.y - b.a.y) < 0.5) {
+  if (a.horizontal && b.horizontal && sameY(a.a, b.a, 0.5)) {
     return overlapLength(a.a.x, a.b.x, b.a.x, b.b.x);
   }
-  if (a.vertical && b.vertical && Math.abs(a.a.x - b.a.x) < 0.5) {
+  if (a.vertical && b.vertical && sameX(a.a, b.a, 0.5)) {
     return overlapLength(a.a.y, a.b.y, b.a.y, b.b.y);
   }
   return 0;
@@ -224,7 +224,7 @@ export function separateSharedRenderedTerminalLanes(
         Math.abs(lane.boundary.y - lane.rect.bottom) < 1
       ) {
         return (
-          Math.abs(shiftedBoundary.y - lane.boundary.y) < EPS_LOCAL &&
+          sameY(shiftedBoundary, lane.boundary, EPS_LOCAL) &&
           shiftedBoundary.x >= lane.rect.left + 1 &&
           shiftedBoundary.x <= lane.rect.right - 1
         );
@@ -235,7 +235,7 @@ export function separateSharedRenderedTerminalLanes(
         Math.abs(lane.boundary.x - lane.rect.right) < 1
       ) {
         return (
-          Math.abs(shiftedBoundary.x - lane.boundary.x) < EPS_LOCAL &&
+          sameX(shiftedBoundary, lane.boundary, EPS_LOCAL) &&
           shiftedBoundary.y >= lane.rect.top + 1 &&
           shiftedBoundary.y <= lane.rect.bottom - 1
         );
