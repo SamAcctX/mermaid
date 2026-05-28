@@ -220,10 +220,6 @@ export function portForRectSide(
   }
 }
 
-function isHorizontalRectSide(side: RectSide): boolean {
-  return side === 'left' || side === 'right';
-}
-
 export function buildOrthogonalPortPath(
   src: Point,
   srcSide: RectSide,
@@ -232,8 +228,8 @@ export function buildOrthogonalPortPath(
   anchor: number,
   epsilon = EPS
 ): Point[] | undefined {
-  const srcH = isHorizontalRectSide(srcSide);
-  const dstH = isHorizontalRectSide(dstSide);
+  const srcH = srcSide === 'left' || srcSide === 'right';
+  const dstH = dstSide === 'left' || dstSide === 'right';
 
   if (srcH && dstH) {
     const opposingDir =
