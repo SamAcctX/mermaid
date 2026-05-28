@@ -1,3 +1,5 @@
+import { isHorizontalSegment, isVerticalSegment } from './geometry.js';
+
 const EPS = 1e-3;
 
 /**
@@ -43,9 +45,9 @@ export function preventSiblingLShapeCrossings(edges: any[]): void {
       continue;
     }
     const [p0, p1, p2, p3] = pts;
-    const firstHoriz = Math.abs(p0.y - p1.y) < EPS && Math.abs(p0.x - p1.x) > EPS;
-    const midVert = Math.abs(p1.x - p2.x) < EPS && Math.abs(p1.y - p2.y) > EPS;
-    const lastHoriz = Math.abs(p2.y - p3.y) < EPS && Math.abs(p2.x - p3.x) > EPS;
+    const firstHoriz = isHorizontalSegment(p0, p1, EPS);
+    const midVert = isVerticalSegment(p1, p2, EPS);
+    const lastHoriz = isHorizontalSegment(p2, p3, EPS);
     if (!firstHoriz || !midVert || !lastHoriz) {
       continue;
     }
