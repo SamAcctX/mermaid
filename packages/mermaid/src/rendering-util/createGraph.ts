@@ -18,8 +18,8 @@ type D3Selection<T extends SVGElement = SVGElement> = Selection<
 //
 // When `window.mermaidCaptureSizes` is truthy, this module records the
 // bounding-box dimensions of every leaf node and edge-label dummy node
-// measured during createGraphWithElements() and emits the result as JSON
-// matching the `.sizes.json` fixture format used by DOM-Decoupled Layout
+// measured during createGraphWithElements() and records data matching the
+// `.sizes.json` fixture format used by DOM-Decoupled Layout
 // Testing (see cypress/platform/dev-diagrams/layout-tests/*.sizes.json).
 //
 // Toggle from the browser devtools:
@@ -27,10 +27,9 @@ type D3Selection<T extends SVGElement = SVGElement> = Selection<
 //   window.mermaidCaptureSizes = true;   // enable
 //   window.mermaidCaptureSizes = false;  // disable
 //
-// Each diagram rendered while enabled logs its capture to the console as a
-// ready-to-copy JSON block and is also appended to
-// `window.mermaidCapturedSizes` (an array) for programmatic access from
-// dev-explorer or test tooling.
+// Each diagram rendered while enabled updates `window.mermaidLastCapturedSizes`
+// and is also appended to `window.mermaidCapturedSizes` (an array) for
+// programmatic access from dev-explorer or test tooling.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface CapturedNodeSize {
@@ -58,6 +57,7 @@ interface CapturedEntry {
 interface CaptureGlobal {
   mermaidCaptureSizes?: boolean;
   mermaidCapturedSizes?: CapturedEntry[];
+  mermaidLastCapturedSizes?: CapturedEntry;
 }
 
 function getCaptureGlobal(): CaptureGlobal | undefined {
@@ -92,11 +92,9 @@ function emitCapturedSizes(captured: CapturedSizes, element: D3Selection): void 
   const svgId = ownerSvg?.id ?? '(unknown)';
 
   g.mermaidCapturedSizes ??= [];
-  g.mermaidCapturedSizes.push({ svgId, sizes: captured });
-
-  const payload = JSON.stringify(captured, null, 2);
-
-  console.info(`[mermaid] captured sizes for "${svgId}"\n${payload}`);
+  const entry = { svgId, sizes: captured };
+  g.mermaidCapturedSizes.push(entry);
+  g.mermaidLastCapturedSizes = entry;
 }
 
 /**

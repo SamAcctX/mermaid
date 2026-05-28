@@ -102,6 +102,10 @@ dev-explorer-app .subtle {
   font-size: 12px;
 }
 
+dev-explorer-app .tooltip-target {
+  display: inline-flex;
+}
+
 dev-explorer-app .content {
   flex: 1;
   min-height: 0;

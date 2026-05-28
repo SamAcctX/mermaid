@@ -9,6 +9,7 @@ import '@shoelace-style/shoelace/dist/components/split-panel/split-panel.js';
 import '@shoelace-style/shoelace/dist/components/tab/tab.js';
 import '@shoelace-style/shoelace/dist/components/tab-group/tab-group.js';
 import '@shoelace-style/shoelace/dist/components/tab-panel/tab-panel.js';
+import '@shoelace-style/shoelace/dist/components/tooltip/tooltip.js';
 
 import './code-editor';
 import './console-panel';
@@ -23,10 +24,27 @@ type MermaidIife = {
   ) => Promise<{ svg: string; bindFunctions?: (el: Element) => void }>;
 };
 
+type CapturedNodeSize = {
+  id: string;
+  width: number;
+  height: number;
+};
+
+type CapturedSizesEntry = {
+  svgId: string;
+  sizes: {
+    nodes: CapturedNodeSize[];
+    metadata?: Record<string, unknown>;
+  };
+};
+
 declare global {
   interface Window {
     mermaid?: MermaidIife;
     mermaidReady?: Promise<MermaidIife>;
+    mermaidCaptureSizes?: boolean;
+    mermaidCapturedSizes?: CapturedSizesEntry[];
+    mermaidLastCapturedSizes?: CapturedSizesEntry;
   }
 }
 
@@ -148,6 +166,13 @@ function normalizeLayout(v: unknown): MermaidLayout | null {
   return null;
 }
 
+function sizeCaptureUnavailableReason(layout: MermaidLayout) {
+  if (layout !== 'swimlanes') {
+    return 'No size data is available for this layout. Select swimlanes to capture DDLT sizes.';
+  }
+  return '';
+}
+
 function parseBoolean(v: unknown): boolean | null {
   if (typeof v !== 'string') return null;
   const s = v.trim().toLowerCase();
@@ -178,6 +203,8 @@ export class DevDiagramViewer extends LitElement {
     dirty: { state: true },
     saving: { state: true },
     saveMessage: { state: true },
+    sizesSaving: { state: true },
+    sizesMessage: { state: true },
   };
 
   declare filePath: string;
@@ -200,6 +227,8 @@ export class DevDiagramViewer extends LitElement {
   declare dirty: boolean;
   declare saving: boolean;
   declare saveMessage: string;
+  declare sizesSaving: boolean;
+  declare sizesMessage: string;
 
   #renderSeq = 0;
   #consolePatched = false;
@@ -279,6 +308,8 @@ export class DevDiagramViewer extends LitElement {
     this.dirty = false;
     this.saving = false;
     this.saveMessage = '';
+    this.sizesSaving = false;
+    this.sizesMessage = '';
   }
 
   createRenderRoot() {
@@ -464,7 +495,8 @@ export class DevDiagramViewer extends LitElement {
   }
 
   async #saveSource() {
-    if (!this.filePath || this.saving || !this.dirty) return;
+    if (!this.filePath || this.saving) return false;
+    if (!this.dirty) return true;
 
     this.saving = true;
     this.error = '';
@@ -487,12 +519,83 @@ export class DevDiagramViewer extends LitElement {
       this.source = nextSource;
       this.dirty = false;
       this.saveMessage = `Saved ${new Date().toLocaleTimeString(undefined, { hour12: false })}`;
-      await this.#renderCurrentSource();
+      return await this.#renderCurrentSource();
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
       this.saveMessage = 'Save failed.';
+      return false;
     } finally {
       this.saving = false;
+    }
+  }
+
+  async #saveSizes() {
+    if (!this.filePath || this.sizesSaving) return;
+
+    const unavailableReason = sizeCaptureUnavailableReason(this.layout);
+    if (unavailableReason) {
+      this.sizesMessage = 'size data unavailable';
+      this.error = unavailableReason;
+      return;
+    }
+
+    this.sizesSaving = true;
+    this.error = '';
+    this.sizesMessage = this.dirty ? 'saving diagram...' : 'capturing sizes...';
+
+    const previousCaptureFlag = Boolean(window.mermaidCaptureSizes);
+    const previousLastCapture = window.mermaidLastCapturedSizes;
+
+    try {
+      if (this.dirty) {
+        const saved = await this.#saveSource();
+        if (!saved) {
+          this.sizesMessage = 'save diagram failed';
+          return;
+        }
+      }
+
+      window.mermaidLastCapturedSizes = undefined;
+      window.mermaidCaptureSizes = true;
+      this.sizesMessage = 'capturing sizes...';
+
+      const rendered = await this.#renderCurrentSource();
+      if (!rendered) {
+        throw new Error(this.error || 'Could not render diagram for size capture');
+      }
+
+      const captured = window.mermaidLastCapturedSizes;
+      const nodes = captured?.sizes.nodes ?? [];
+      if (nodes.length === 0) {
+        throw new Error('Mermaid did not capture any node sizes; select a capture-enabled layout');
+      }
+
+      this.sizesMessage = 'saving sizes...';
+      const res = await fetch('/dev/api/sizes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: this.filePath,
+          nodes,
+          capturedFrom: `dev-explorer ${this.filePath} theme=${this.theme} look=${this.look} layout=${this.layout}`,
+        }),
+      });
+      if (!res.ok) {
+        const message = await res.text();
+        throw new Error(message || `HTTP ${res.status}`);
+      }
+
+      const json = (await res.json()) as { path?: string; nodes?: number };
+      this.sizesMessage = `sizes saved${json.nodes ? ` (${json.nodes})` : ''}`;
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      this.sizesMessage = 'size save failed';
+    } finally {
+      window.mermaidCaptureSizes = previousCaptureFlag;
+      if (!window.mermaidLastCapturedSizes) {
+        window.mermaidLastCapturedSizes = previousLastCapture;
+      }
+      this.sizesSaving = false;
     }
   }
 
@@ -501,12 +604,8 @@ export class DevDiagramViewer extends LitElement {
     this.dirty = value !== this.savedSource;
     if (this.dirty) {
       this.saveMessage = '';
+      this.sizesMessage = '';
     }
-  }
-
-  #reloadFromDisk() {
-    this.saveMessage = '';
-    void this.#loadAndRender();
   }
 
   async #loadAndRender() {
@@ -525,6 +624,7 @@ export class DevDiagramViewer extends LitElement {
       this.editorSource = source;
       this.dirty = false;
       this.saveMessage = '';
+      this.sizesMessage = '';
       await this.#renderMermaid(source);
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
@@ -542,11 +642,13 @@ export class DevDiagramViewer extends LitElement {
     this.#syncConsolePanelFilters();
     try {
       const source = this.source;
-      if (!source) return;
-      if (seq !== this.#renderSeq) return;
+      if (!source) return false;
+      if (seq !== this.#renderSeq) return false;
       await this.#renderMermaid(source);
+      return true;
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
+      return false;
     } finally {
       this.loading = false;
     }
@@ -609,6 +711,12 @@ export class DevDiagramViewer extends LitElement {
       : this.dirty
         ? 'unsaved changes'
         : this.saveMessage || 'saved';
+    const sizesStatus = this.sizesSaving
+      ? this.sizesMessage || 'saving sizes...'
+      : this.sizesMessage;
+    const sizesUnavailableReason = sizeCaptureUnavailableReason(this.layout);
+    const saveSizesDisabled =
+      this.loading || this.saving || this.sizesSaving || Boolean(sizesUnavailableReason);
 
     return html`
       <div class="header">
@@ -796,24 +904,33 @@ export class DevDiagramViewer extends LitElement {
                 <div class="path">${this.filePath}</div>
                 <div class="spacer"></div>
                 <div class="subtle">${saveStatus}</div>
-                <sl-button
-                  size="small"
-                  variant="default"
-                  ?disabled=${this.loading || this.saving}
-                  @click=${() => this.#reloadFromDisk()}
-                >
-                  <sl-icon slot="prefix" name="arrow-clockwise"></sl-icon>
-                  Reload
-                </sl-button>
+                ${sizesStatus ? html`<div class="subtle">${sizesStatus}</div>` : nothing}
                 <sl-button
                   size="small"
                   variant="primary"
-                  ?disabled=${!this.dirty || this.saving}
+                  ?disabled=${!this.dirty || this.saving || this.sizesSaving}
                   @click=${() => void this.#saveSource()}
                 >
                   <sl-icon slot="prefix" name="floppy"></sl-icon>
                   Save
                 </sl-button>
+                <sl-tooltip
+                  content=${sizesUnavailableReason}
+                  ?disabled=${!sizesUnavailableReason}
+                  hoist
+                >
+                  <span class="tooltip-target">
+                    <sl-button
+                      size="small"
+                      variant="default"
+                      ?disabled=${saveSizesDisabled}
+                      @click=${() => void this.#saveSizes()}
+                    >
+                      <sl-icon slot="prefix" name="rulers"></sl-icon>
+                      Save sizes
+                    </sl-button>
+                  </span>
+                </sl-tooltip>
               </div>
               <dev-code-editor
                 .value=${this.editorSource}

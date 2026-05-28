@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { packageOptions } from '../.build/common.js';
 import { generateLangium } from '../.build/generateLangium.js';
 import { defaultOptions, getBuildConfig } from './util.js';
+import { DDLT_SIZE_CAPTURE_VERSION } from '../packages/mermaid/src/rendering-util/layout-algorithms/ddlt/captureContract.js';
 import 'dotenv/config';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -131,6 +132,12 @@ interface DevExplorerEntry {
   path: string; // posix-style, relative to root
 }
 
+interface DevExplorerCapturedNodeSize {
+  id: string;
+  width: number;
+  height: number;
+}
+
 const devExplorerRootAbs = resolve(
   process.cwd(),
   process.env.MERMAID_DEV_EXPLORER_ROOT ?? 'cypress/platform/dev-diagrams'
@@ -138,6 +145,40 @@ const devExplorerRootAbs = resolve(
 
 function toPosixPath(p: string) {
   return p.split(path.sep).join('/');
+}
+
+function hashDdltFixtureSource(source: string) {
+  return createHash('sha256').update(source.replace(/\r\n/g, '\n')).digest('hex');
+}
+
+function normalizeCapturedNodeSizes(value: unknown): DevExplorerCapturedNodeSize[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const nodes: DevExplorerCapturedNodeSize[] = [];
+  for (const item of value) {
+    if (item == null || typeof item !== 'object') {
+      return null;
+    }
+    const candidate = item as Record<string, unknown>;
+    const { id, width, height } = candidate;
+    if (
+      typeof id !== 'string' ||
+      typeof width !== 'number' ||
+      typeof height !== 'number' ||
+      !Number.isFinite(width) ||
+      !Number.isFinite(height)
+    ) {
+      return null;
+    }
+    nodes.push({
+      id,
+      width,
+      height,
+    });
+  }
+  return nodes;
 }
 
 function resolveWithinDevExplorerRoot(requestedPath: unknown) {
@@ -347,6 +388,52 @@ async function createServer() {
       });
     } catch (_e) {
       res.status(400).json({ error: 'Invalid path' });
+    }
+  });
+
+  app.post('/dev/api/sizes', express.json({ limit: '1mb' }), async (req, res) => {
+    try {
+      const body = req.body as Record<string, unknown> | undefined;
+      const { absPath, relPath } = resolveWithinDevExplorerRoot(body?.path);
+      if (!absPath.endsWith('.mmd')) {
+        res.status(400).json({ error: 'Only .mmd files are allowed' });
+        return;
+      }
+
+      const stats = await fs.stat(absPath);
+      if (!stats.isFile()) {
+        res.status(400).json({ error: 'Not a file' });
+        return;
+      }
+
+      const nodes = normalizeCapturedNodeSizes(body?.nodes);
+      if (!nodes || nodes.length === 0) {
+        res.status(400).json({ error: 'Expected a non-empty nodes array' });
+        return;
+      }
+
+      const mmdSource = await fs.readFile(absPath, 'utf-8');
+      const sizesPath = absPath.replace(/\.mmd$/, '.sizes.json');
+      const sizesRelPath = relPath.replace(/\.mmd$/, '.sizes.json');
+      const capturedFrom =
+        typeof body?.capturedFrom === 'string' ? body.capturedFrom : `dev-explorer ${relPath}`;
+      const fixture = {
+        nodes,
+        metadata: {
+          captureVersion: DDLT_SIZE_CAPTURE_VERSION,
+          sourceSha256: hashDdltFixtureSource(mmdSource),
+          capturedAt: new Date().toISOString(),
+          capturedFrom,
+        },
+      };
+
+      await fs.writeFile(sizesPath, `${JSON.stringify(fixture, null, 2)}\n`, 'utf-8');
+      res.json({
+        path: sizesRelPath,
+        nodes: nodes.length,
+      });
+    } catch (_e) {
+      res.status(400).json({ error: 'Invalid sizes payload' });
     }
   });
 
