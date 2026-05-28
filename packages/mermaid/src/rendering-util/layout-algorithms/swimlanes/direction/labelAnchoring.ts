@@ -243,18 +243,14 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
         midY: a.y + (b.y - a.y) * t,
       };
     };
-    const rectAtT = (seg: SegmentCandidate, t: number): RectLite => {
-      const { midX, midY } = anchorAtT(seg, t);
-      return rectFromCenterSize(midX, midY, lw, lh);
-    };
-
     const tryPool = (
       pool: SegmentCandidate[]
     ): { laneId: string; anchor: { midX: number; midY: number } } | undefined => {
       const rankedPool = rankSegments(pool);
       for (const seg of rankedPool) {
         for (const t of ALONG_SEGMENT_TS) {
-          const rect = rectAtT(seg, t);
+          const anchor = anchorAtT(seg, t);
+          const rect = rectFromCenterSize(anchor.midX, anchor.midY, lw, lh);
           const laneId = findContainingLane(rect);
           if (!laneId) {
             continue;
@@ -263,7 +259,7 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
             continue;
           }
           if (!labelOverlapsAnything(labelId, edge.id, rect)) {
-            return { laneId, anchor: anchorAtT(seg, t) };
+            return { laneId, anchor };
           }
         }
       }
