@@ -329,13 +329,11 @@ export function mergeDummies(
   const { topLaneOf } = accessors;
 
   const lanes = buildLaneExtents(out, accessors);
-  const corridorUtils = createCorridorUtils(lanes);
   const { laneMargin, laneLeft, laneRight, corridorBetween, internalRight, internalLeft } =
-    corridorUtils;
+    createCorridorUtils(lanes);
 
   const obstacles = buildObstacles(out, accessors);
 
-  const trackAllocator = createTrackAllocator(EDGE_GAP);
   const {
     chooseHTrackOffset,
     canReserveHorizontal,
@@ -344,7 +342,7 @@ export function mergeDummies(
     reserveVertical,
     chooseBoundaryVTrack,
     allocateCorridorVTrack,
-  } = trackAllocator;
+  } = createTrackAllocator(EDGE_GAP);
 
   const byRef = new Map<string, EdgeRef[]>();
 
