@@ -3,20 +3,6 @@ import { EDGE_ROUTING } from './config.js';
 
 // cspell:ignore bvert
 
-/**
- * Phase 4 dummy-merge and edge routing.
- *
- * Takes the coordinate assignment produced for a graph with dummy nodes
- * (proper layering) and converts each original edge back into an orthogonal
- * polyline that respects swimlanes, lane boundaries and simple obstacle
- * avoidance. All node coordinates are treated as fixed input; only
- * `edgePoints` is filled in.
- */
-
-// ============================================================================
-// Phase 4 – Dummy merge and edge routing
-// ============================================================================
-
 const EDGE_GAP = EDGE_ROUTING.EDGE_GAP;
 const LANE_MARGIN = EDGE_ROUTING.LANE_MARGIN;
 
@@ -44,13 +30,6 @@ interface CorridorLocation {
   key: string;
 }
 
-// ============================================================================
-// Helper Functions for mergeDummies
-// ============================================================================
-
-/**
- * Creates node accessor functions for the mergeDummies algorithm
- */
 function createNodeAccessors(gWithDummies: Graph, original: Graph) {
   const getNode = (id: NodeId) => original.nodeById.get(id) as any;
   const isDummy = (id: NodeId) => !!(gWithDummies.nodeById.get(id) as any)?.isDummy;
@@ -60,8 +39,6 @@ function createNodeAccessors(gWithDummies: Graph, original: Graph) {
 
   const topLaneOf = (id: NodeId): string | null => {
     const n = getNode(id);
-    // Placeholder dummy nodes don't belong to any lane
-    // But edge label nodes (isEdgeLabel: true) should use their parentId lane
     if (!n || (isDummy(id) && !isEdgeLabelNode(id))) {
       return null;
     }
@@ -77,12 +54,9 @@ function createNodeAccessors(gWithDummies: Graph, original: Graph) {
     return pid ?? null;
   };
 
-  return { getNode, isDummy, isEdgeLabelNode, getWidth, getHeight, topLaneOf };
+  return { getNode, isDummy, getWidth, getHeight, topLaneOf };
 }
 
-/**
- * Builds lane extent information from placed real nodes
- */
 function buildLaneExtents(
   coords: Coordinates,
   accessors: ReturnType<typeof createNodeAccessors>
@@ -109,14 +83,9 @@ function buildLaneExtents(
   return lanes;
 }
 
-/**
- * Creates corridor utility functions for lane-aware routing
- */
 function createCorridorUtils(lanes: Map<string | null, LaneInfo>) {
-  const edgeGap = EDGE_GAP;
   const laneMargin = LANE_MARGIN;
 
-  // Sort lanes by center X for left-to-right ordering
   const laneOrder = [...lanes.entries()]
     .map(([k, v]) => ({ id: k, ...v }))
     .sort((a, b) => a.center - b.center)
@@ -149,10 +118,7 @@ function createCorridorUtils(lanes: Map<string | null, LaneInfo>) {
   };
 
   return {
-    edgeGap,
     laneMargin,
-    laneOrder,
-    laneIndex,
     laneLeft,
     laneRight,
     corridorBetween,
@@ -161,9 +127,6 @@ function createCorridorUtils(lanes: Map<string | null, LaneInfo>) {
   };
 }
 
-/**
- * Builds obstacle rectangles from real nodes (excluding groups)
- */
 function buildObstacles(
   coords: Coordinates,
   accessors: ReturnType<typeof createNodeAccessors>
@@ -196,9 +159,6 @@ function buildObstacles(
   return obstacles;
 }
 
-/**
- * Creates clearance checking functions for obstacle avoidance
- */
 function createClearanceCheckers(obstacles: Rect[]) {
   const clearHorizontal = (y: number, x1: number, x2: number, skip: Set<NodeId>) => {
     const a = Math.min(x1, x2);
@@ -231,9 +191,6 @@ function createClearanceCheckers(obstacles: Rect[]) {
   return { clearHorizontal, clearVertical };
 }
 
-/**
- * Creates interval overlap and reservation utilities
- */
 function createIntervalUtils() {
   const occupies = (intervals: Interval[], a: number, b: number): boolean => {
     const x = Math.min(a, b);
@@ -253,10 +210,6 @@ function createIntervalUtils() {
   return { occupies, reserveInterval };
 }
 
-/**
- * Creates track allocation system for edge routing
- * Manages vertical and horizontal track allocation to prevent edge overlaps
- */
 function createTrackAllocator(
   edgeGap: number,
   intervalUtils: ReturnType<typeof createIntervalUtils>
@@ -298,13 +251,11 @@ function createTrackAllocator(
 
   const corridorRes = new Map<string, Map<number, Interval[]>>();
 
-  // Horizontal corridor track allocation by overlapping x-intervals per corridor@layer
   const hCorridorRes = new Map<string, Map<number, Interval[]>>();
 
   const chooseHTrackOffset = (key: string, x1: number, x2: number): number =>
     chooseTrack(hCorridorRes, key, x1, x2);
 
-  // Straight-line occupancy to avoid sharing the same lane/track
   const horizRes = new Map<string, Interval[]>();
   const vertRes = new Map<string, Interval[]>();
   const horizKey = (y: number) => y.toFixed(2);
@@ -348,15 +299,11 @@ function createTrackAllocator(
     reserveInterval(arr, y1, y2);
   };
 
-  // Boundary vertical track allocation (to avoid stacked taps at lane edges)
   const boundaryVRes = new Map<string, Map<number, Interval[]>>();
 
   const chooseBoundaryVTrack = (key: string, y1: number, y2: number): number =>
     chooseTrack(boundaryVRes, key, y1, y2);
 
-  // Allocate vertical track in a corridor keyed by corridor id, but also ensure
-  // global vertical occupancy by absolute X so parallel verticals that share X
-  // across different logical corridors don't overlap.
   const allocateCorridorVTrack = (key: string, baseX: number, y1: number, y2: number): number => {
     const lo = Math.min(y1, y2);
     const hi = Math.max(y1, y2);
@@ -395,21 +342,17 @@ export function mergeDummies(
     edgePoints: {},
   };
 
-  // Create helper functions
   const accessors = createNodeAccessors(gWithDummies, original);
   const { topLaneOf } = accessors;
 
-  // Build lane extents and corridor utilities
   const lanes = buildLaneExtents(out, accessors);
   const corridorUtils = createCorridorUtils(lanes);
   const { laneMargin, laneLeft, laneRight, corridorBetween, internalRight, internalLeft } =
     corridorUtils;
 
-  // Build obstacles and clearance checkers
   const obstacles = buildObstacles(out, accessors);
   const { clearHorizontal, clearVertical } = createClearanceCheckers(obstacles);
 
-  // Create track allocation system
   const intervalUtils = createIntervalUtils();
   const trackAllocator = createTrackAllocator(EDGE_GAP, intervalUtils);
   const {
@@ -422,7 +365,6 @@ export function mergeDummies(
     allocateCorridorVTrack,
   } = trackAllocator;
 
-  // For each original edge (by ref), build an orthogonal polyline that stays in corridors
   const byRef = new Map<string, EdgeRef[]>();
 
   for (const e of gWithDummies.edges) {
@@ -433,9 +375,6 @@ export function mergeDummies(
     byRef.get(rid)!.push(e);
   }
 
-  // Per-source fan-out bundling for edges to subsequent layers: choose one side rail
-  // If a source has >1 outgoing original edges, pick the side (left/right internal corridor)
-  // that minimizes total horizontal travel to/from that side for all its targets.
   const fanoutSide = new Map<NodeId, 'left' | 'right'>();
   {
     const perSrc = new Map<NodeId, NodeId[]>();
@@ -487,17 +426,14 @@ export function mergeDummies(
     const sl = topLaneOf(src);
     const tl = topLaneOf(dst);
 
-    // Start at source center
     points.push({ x: sx, y: sy });
 
-    // If a straight segment is possible without crossing nodes, prefer it
     const skip = new Set<NodeId>([src, dst]);
     if (
       Math.abs(sy - ty) < 1e-6 &&
       clearHorizontal(sy, sx, tx, skip) &&
       canReserveHorizontal(sy, sx, tx)
     ) {
-      // straight horizontal; keep it single segment
       reserveHorizontal(sy, sx, tx);
       points.push({ x: tx, y: ty });
       (out.edgePoints as any)[rid] = points;
@@ -508,7 +444,6 @@ export function mergeDummies(
       clearVertical(sx, sy, ty, skip) &&
       canReserveVertical(sx, sy, ty)
     ) {
-      // straight vertical; add a midpoint so consumers expecting interior points (e.g., long dummy chains) still see one
       reserveVertical(sx, sy, ty);
       const midY = (sy + ty) / 2;
       points.push({ x: sx, y: midY });
@@ -524,7 +459,6 @@ export function mergeDummies(
     const tlf = laneLeft(tl);
 
     if (sameLane) {
-      // choose the nearer internal corridor (left or right) to minimize horizontal stubs
       const right = internalRight(sl);
       const left = internalLeft(sl);
       const costR = Math.abs(right.x - sx) + Math.abs(tx - right.x);
@@ -537,7 +471,6 @@ export function mergeDummies(
       const base = useRight ? right : left;
       const baseX = base.x;
       const key = base.key;
-      // allocate an outgoing horizontal band from the source node so multiple edges don't overlap
       const outKey = `boundary:${sl}:${useRight ? 'right' : 'left'}:y=${sy.toFixed(2)}`;
       const hOut = chooseHTrackOffset(outKey, Math.min(sx, baseX), Math.max(sx, baseX));
       const shy = sy + hOut;
@@ -546,11 +479,8 @@ export function mergeDummies(
       }
       const vOff = allocateCorridorVTrack(key, baseX, Math.min(shy, ty), Math.max(shy, ty));
       const cx = baseX + vOff;
-      // go horizontally out on shy
       points.push({ x: cx, y: shy });
-      // go vertically to ty
       points.push({ x: cx, y: ty });
-      // final horizontal into target with per-target band (matching side)
       const inKey = `boundary:${tl}:${useRight ? 'right' : 'left'}:y=${ty.toFixed(2)}`;
       const hIn = chooseHTrackOffset(inKey, Math.min(cx, tx), Math.max(cx, tx));
       const thy = ty + hIn;
@@ -562,9 +492,7 @@ export function mergeDummies(
         points.push({ x: tx, y: ty });
       }
     } else {
-      // route via corridor between lanes
       const { x: midX, key } = corridorBetween(sl, tl);
-      // choose an outgoing band from the source node to the lane boundary
       let goRight = midX >= sx;
       const foSide2 = fanoutSide.get(src);
       if (foSide2) {
@@ -577,12 +505,9 @@ export function mergeDummies(
       if (shy !== sy) {
         points.push({ x: sx, y: shy });
       }
-      // prepare boundary vertical at source if band changes
       let bX1 = exitX;
-      // pick vertical track in corridor first (as before)
       const vOff = allocateCorridorVTrack(key, midX, Math.min(shy, ty), Math.max(shy, ty));
       const cx = midX + vOff;
-      // horizontal band near source layer inside corridor
       const hKeySy = `${key}:y=${shy.toFixed(2)}`;
       const hOff1 = chooseHTrackOffset(hKeySy, Math.min(exitX, cx), Math.max(exitX, cx));
       const hy1 = shy + hOff1;
@@ -596,9 +521,7 @@ export function mergeDummies(
         points.push({ x: bX1, y: hy1 });
       }
       points.push({ x: cx, y: hy1 });
-      // vertical down/up to target y
       points.push({ x: cx, y: ty });
-      // move into target from corridor side using separate horizontal band near target layer
       const enterX = cx <= tx ? tlf - laneMargin / 2 : tr + laneMargin / 2;
       const hKeyTy = `${key}:y=${ty.toFixed(2)}`;
       const hOff2 = chooseHTrackOffset(hKeyTy, Math.min(enterX, cx), Math.max(enterX, cx));
@@ -611,7 +534,6 @@ export function mergeDummies(
         points.push({ x: cx, y: hy2 });
       }
       points.push({ x: bX2, y: hy2 });
-      // inside target lane, allocate per-target band for final horizontal
       const inNodeKey = `in-node:${dst}:${cx <= tx ? 'left' : 'right'}`;
       const hInNode = chooseHTrackOffset(inNodeKey, Math.min(bX2, tx), Math.max(bX2, tx));
       const ty2 = ty + hInNode;
@@ -624,7 +546,6 @@ export function mergeDummies(
       }
     }
 
-    // Deduplicate consecutive duplicate points
     const cleaned: { x: number; y: number }[] = [];
     for (const p of points) {
       const last = cleaned[cleaned.length - 1];
