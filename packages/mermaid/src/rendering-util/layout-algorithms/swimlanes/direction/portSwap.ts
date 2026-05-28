@@ -1,6 +1,6 @@
 // cspell:ignore Battista Eades Eiglsperger Hegemann Kandinsky segs Siebenhaller Tamassia Tollis Fößmeier
 import type { Edge, Node } from '../../../types.js';
-import { orthogonalSegmentsCross } from './geometry.js';
+import { collectRealNodeBounds, orthogonalSegmentsCross, segmentHitsAnyRect } from './geometry.js';
 
 const EPS = 1e-6;
 // δ_s — the Kandinsky port-spacing constant (Fößmeier–Kaufmann 1995;
@@ -19,20 +19,6 @@ const TRY_DELTAS = [0, PORT_SHIFT, -PORT_SHIFT, 2 * PORT_SHIFT, -2 * PORT_SHIFT]
 interface PointLite {
   x: number;
   y: number;
-}
-
-interface RectLite {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-}
-
-interface NodeInfo {
-  id: string;
-  cx: number;
-  cy: number;
-  rect: RectLite;
 }
 
 /**
@@ -81,7 +67,7 @@ interface NodeInfo {
  *                                     rewrite.
  *   2. No new edge-edge crossings    — orthogonalSegmentsCross vs every other
  *                                     non-self segment.
- *   3. No new edge-node collisions   — segmentHitsNode (both new segs,
+ *   3. No new edge-node collisions   — segment-vs-node guard (both new segs,
  *                                     excluding src for seg-1 and dst
  *                                     for seg-2).
  *   4. Kandinsky face capacity       — port-offset delta chosen from
@@ -111,52 +97,7 @@ interface NodeInfo {
  * direction — the whole point.
  */
 export function portSwapToLShape(edges: Edge[], nodes: Node[]): void {
-  const nodeInfoById = new Map<string, NodeInfo>();
-  const realNodeRects: { id: string; rect: RectLite }[] = [];
-  for (const n of nodes) {
-    if (n.isGroup) {
-      continue;
-    }
-    if (n.isEdgeLabel) {
-      continue;
-    }
-    const cx = n.x ?? 0;
-    const cy = n.y ?? 0;
-    const w = n.width ?? 0;
-    const h = n.height ?? 0;
-    if (w <= 0 || h <= 0) {
-      continue;
-    }
-    const rect: RectLite = {
-      left: cx - w / 2,
-      right: cx + w / 2,
-      top: cy - h / 2,
-      bottom: cy + h / 2,
-    };
-    nodeInfoById.set(n.id, { id: n.id, cx, cy, rect });
-    realNodeRects.push({ id: n.id, rect });
-  }
-
-  const segmentHitsNode = (a: PointLite, b: PointLite, excludeIds: string[]): boolean => {
-    const minX = Math.min(a.x, b.x);
-    const maxX = Math.max(a.x, b.x);
-    const minY = Math.min(a.y, b.y);
-    const maxY = Math.max(a.y, b.y);
-    for (const n of realNodeRects) {
-      if (excludeIds.includes(n.id)) {
-        continue;
-      }
-      if (
-        maxX > n.rect.left + 1 &&
-        minX < n.rect.right - 1 &&
-        maxY > n.rect.top + 1 &&
-        minY < n.rect.bottom - 1
-      ) {
-        return true;
-      }
-    }
-    return false;
-  };
+  const { nodeInfoById, realNodeRects } = collectRealNodeBounds(nodes);
 
   // Collinear-axis overlap: two segments on the same axis at the same
   // coordinate with overlapping spans. Not flagged by orthogonalSegmentsCross
@@ -293,10 +234,10 @@ export function portSwapToLShape(edges: Edge[], nodes: Node[]): void {
 
       // Guard 3: no edge-node collisions. Seg 1 may touch src; seg 2 may
       // touch dst. Excluding those ids from the hit check.
-      if (!firstSegDegenerate && segmentHitsNode(np0, np1, [srcId])) {
+      if (!firstSegDegenerate && segmentHitsAnyRect(np0, np1, realNodeRects, [srcId], 1)) {
         continue;
       }
-      if (!secondSegDegenerate && segmentHitsNode(np1, np2, [dstId])) {
+      if (!secondSegDegenerate && segmentHitsAnyRect(np1, np2, realNodeRects, [dstId], 1)) {
         continue;
       }
 

@@ -1,6 +1,6 @@
 // cspell:ignore Hegemann Kandinsky Siebenhaller
 import type { Edge, Node } from '../../../types.js';
-import { orthogonalSegmentsCross } from './geometry.js';
+import { collectRealNodeBounds, orthogonalSegmentsCross, segmentHitsAnyRect } from './geometry.js';
 
 const EPS = 1e-6;
 const MIN_PORT_SPACING = 8;
@@ -10,20 +10,6 @@ const LABEL_CLEARANCE_BUFFER = 3;
 interface PointLite {
   x: number;
   y: number;
-}
-
-interface RectLite {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-}
-
-interface NodeInfo {
-  id: string;
-  cx: number;
-  cy: number;
-  rect: RectLite;
 }
 
 interface LabelDim {
@@ -53,8 +39,7 @@ function pairKey(a: string, b: string): string {
  * minimize blast radius.
  */
 export function straightenCollinearSiblingDetours(edges: Edge[], nodes: Node[]): void {
-  const nodeInfoById = new Map<string, NodeInfo>();
-  const realNodeRects: { id: string; rect: RectLite }[] = [];
+  const { nodeInfoById, realNodeRects } = collectRealNodeBounds(nodes);
   // Side table of label-node dimensions so we can grow the rescue delta
   // far enough to clear a label sitting on the sibling line.
   const labelDimById = new Map<string, LabelDim>();
@@ -70,21 +55,6 @@ export function straightenCollinearSiblingDetours(edges: Edge[], nodes: Node[]):
       });
       continue;
     }
-    const cx = n.x ?? 0;
-    const cy = n.y ?? 0;
-    const w = n.width ?? 0;
-    const h = n.height ?? 0;
-    if (w <= 0 || h <= 0) {
-      continue;
-    }
-    const rect: RectLite = {
-      left: cx - w / 2,
-      right: cx + w / 2,
-      top: cy - h / 2,
-      bottom: cy + h / 2,
-    };
-    nodeInfoById.set(id, { id, cx, cy, rect });
-    realNodeRects.push({ id, rect });
   }
 
   // For a given (this-edge, axis) pair, find the largest label half-extent
@@ -131,27 +101,6 @@ export function straightenCollinearSiblingDetours(edges: Edge[], nodes: Node[]):
       consider(other.labelNodeId);
     }
     return maxHalf > 0 ? maxHalf + LABEL_CLEARANCE_BUFFER : 0;
-  };
-
-  const segmentHitsNode = (a: PointLite, b: PointLite, excludeIds: string[]): boolean => {
-    const minX = Math.min(a.x, b.x);
-    const maxX = Math.max(a.x, b.x);
-    const minY = Math.min(a.y, b.y);
-    const maxY = Math.max(a.y, b.y);
-    for (const n of realNodeRects) {
-      if (excludeIds.includes(n.id)) {
-        continue;
-      }
-      if (
-        maxX > n.rect.left + 1 &&
-        minX < n.rect.right - 1 &&
-        maxY > n.rect.top + 1 &&
-        minY < n.rect.bottom - 1
-      ) {
-        return true;
-      }
-    }
-    return false;
   };
 
   for (const edge of edges) {
@@ -204,7 +153,7 @@ export function straightenCollinearSiblingDetours(edges: Edge[], nodes: Node[]):
       targetDst = { x: dstEast ? dstInfo.rect.left : dstInfo.rect.right, y: dstInfo.cy };
     }
 
-    if (segmentHitsNode(targetSrc, targetDst, [srcId, dstId])) {
+    if (segmentHitsAnyRect(targetSrc, targetDst, realNodeRects, [srcId, dstId], 1)) {
       continue;
     }
 
@@ -247,7 +196,7 @@ export function straightenCollinearSiblingDetours(edges: Edge[], nodes: Node[]):
         }
       }
 
-      if (segmentHitsNode(shiftedSrc, shiftedDst, [srcId, dstId])) {
+      if (segmentHitsAnyRect(shiftedSrc, shiftedDst, realNodeRects, [srcId, dstId], 1)) {
         continue;
       }
 

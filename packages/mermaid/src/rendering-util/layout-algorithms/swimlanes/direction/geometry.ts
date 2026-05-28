@@ -12,6 +12,26 @@ export interface RectBounds {
   bottom: number;
 }
 
+export interface RectEntry {
+  id: string;
+  rect: RectBounds;
+}
+
+export interface NodeBoundsInfo extends RectEntry {
+  cx: number;
+  cy: number;
+}
+
+interface NodeBoundsInput {
+  id?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  isGroup?: boolean;
+  isEdgeLabel?: boolean;
+}
+
 interface SimplifyPassResult {
   points: Point[];
   changed: boolean;
@@ -71,6 +91,68 @@ export function segmentBoundsOverlapRect(
     segMaxY > rect.top - buffer &&
     segMinY < rect.bottom + buffer
   );
+}
+
+export function rectFromCenterSize(
+  cx: number,
+  cy: number,
+  width: number,
+  height: number
+): RectBounds {
+  return {
+    left: cx - width / 2,
+    right: cx + width / 2,
+    top: cy - height / 2,
+    bottom: cy + height / 2,
+  };
+}
+
+export function collectRealNodeBounds(nodes: Iterable<NodeBoundsInput>): {
+  nodeInfoById: Map<string, NodeBoundsInfo>;
+  realNodeRects: RectEntry[];
+} {
+  const nodeInfoById = new Map<string, NodeBoundsInfo>();
+  const realNodeRects: RectEntry[] = [];
+  for (const node of nodes) {
+    if (node.isGroup || node.isEdgeLabel) {
+      continue;
+    }
+    const cx = node.x ?? 0;
+    const cy = node.y ?? 0;
+    const width = node.width ?? 0;
+    const height = node.height ?? 0;
+    if (width <= 0 || height <= 0) {
+      continue;
+    }
+    const id = String(node.id ?? '');
+    const info: NodeBoundsInfo = {
+      id,
+      cx,
+      cy,
+      rect: rectFromCenterSize(cx, cy, width, height),
+    };
+    nodeInfoById.set(id, info);
+    realNodeRects.push({ id, rect: info.rect });
+  }
+  return { nodeInfoById, realNodeRects };
+}
+
+export function segmentHitsAnyRect(
+  a: Point,
+  b: Point,
+  rects: RectEntry[],
+  excludeIds: string[] = [],
+  shrink = 0
+): boolean {
+  for (const entry of rects) {
+    if (excludeIds.includes(entry.id)) {
+      continue;
+    }
+    if (segmentBoundsOverlapRect(a, b, entry.rect, -shrink)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function orthogonalSegmentsCross(

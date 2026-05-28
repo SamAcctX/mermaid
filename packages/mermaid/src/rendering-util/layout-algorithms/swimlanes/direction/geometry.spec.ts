@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { orthogonalSegmentsCross, orthogonalSegmentsStrictlyCross } from './geometry.js';
+import {
+  collectRealNodeBounds,
+  orthogonalSegmentsCross,
+  orthogonalSegmentsStrictlyCross,
+  segmentHitsAnyRect,
+} from './geometry.js';
 
 const p = (x: number, y: number) => ({ x, y });
 
@@ -41,6 +46,48 @@ describe('swimlane direction geometry', () => {
       expect(
         orthogonalSegmentsStrictlyCross(p(-10, 0), p(10, 0), p(9.9995, -10), p(9.9995, 10))
       ).toBe(false);
+    });
+  });
+
+  describe('node bounds helpers', () => {
+    it('collects only real visible nodes', () => {
+      const { nodeInfoById, realNodeRects } = collectRealNodeBounds([
+        { id: 'A', x: 10, y: 20, width: 40, height: 20 },
+        { id: 'group', isGroup: true, x: 10, y: 20, width: 40, height: 20 },
+        { id: 'label', isEdgeLabel: true, x: 10, y: 20, width: 40, height: 20 },
+        { id: 'empty', x: 10, y: 20, width: 0, height: 20 },
+      ]);
+
+      expect([...nodeInfoById.keys()]).toEqual(['A']);
+      expect(realNodeRects).toEqual([
+        {
+          id: 'A',
+          rect: {
+            left: -10,
+            right: 30,
+            top: 10,
+            bottom: 30,
+          },
+        },
+      ]);
+    });
+
+    it('checks segment hits with exclusions and shrink', () => {
+      const rects = [
+        {
+          id: 'A',
+          rect: {
+            left: 0,
+            right: 10,
+            top: 0,
+            bottom: 10,
+          },
+        },
+      ];
+
+      expect(segmentHitsAnyRect(p(-5, 5), p(15, 5), rects)).toBe(true);
+      expect(segmentHitsAnyRect(p(-5, 5), p(15, 5), rects, ['A'])).toBe(false);
+      expect(segmentHitsAnyRect(p(-5, 0.5), p(15, 0.5), rects, [], 1)).toBe(false);
     });
   });
 });
