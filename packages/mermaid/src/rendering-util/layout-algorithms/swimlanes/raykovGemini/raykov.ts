@@ -1835,20 +1835,7 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
           }
         }
 
-        const getDist = (edgeIdx: number) => {
-          const indices = edgeSegmentIndices[edgeIdx];
-          if (indices.length < 2) {
-            return 0;
-          }
-          // ...
-          // Source handle connects to pSrcPort.
-          // pSrcPort IS the start of Handle.
-          // So continuity is about pSrcPort vs Handle Pipe?
-          // Handle Pipe is snapped to pSrcPort. So diff is 0.
-          return 0;
-        };
-
-        return getDist(a) - getDist(b);
+        return 0;
       });
 
       const handles = grp.map((ei) => allRoutedSegments[edgeSegmentIndices[ei][0]]);
