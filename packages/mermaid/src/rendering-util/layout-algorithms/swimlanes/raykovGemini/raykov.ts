@@ -5,40 +5,12 @@ import { PRECISION } from '../config.js';
 
 const EPS = PRECISION.EPSILON;
 
-// ---------------------------------------------------------------------------
-// Routing Configuration
-// ---------------------------------------------------------------------------
-
-/**
- * Configuration options for the orthogonal edge router.
- * All values are in pixels.
- */
-interface RaykovRoutingConfig {
-  /** Padding around nodes when creating obstacle rects (default: 4) */
-  nodePadding: number;
-  /** Margin for horizontal pipes around obstacles (default: 10) */
-  horizontalPipeMargin: number;
-  /** Margin for vertical pipes around obstacles (default: 10) */
-  verticalPipeMargin: number;
-  /** Margin for expanding bounding box around blocking obstacles (default: 20) */
-  routingMargin: number;
-  /** Offset from node boundary to anchor point (default: 20) */
-  anchorOffset: number;
-  /** Spacing between parallel tracks in the same pipe (default: 10) */
-  trackSpacing: number;
-}
-
-/** Default routing configuration */
-const DEFAULT_ROUTING_CONFIG: RaykovRoutingConfig = {
-  nodePadding: 8,
-  horizontalPipeMargin: 15,
-  verticalPipeMargin: 15,
-  routingMargin: 25,
-  anchorOffset: 20,
-  trackSpacing: 10,
-};
-
-const currentConfig: RaykovRoutingConfig = DEFAULT_ROUTING_CONFIG;
+const NODE_PADDING = 8;
+const HORIZONTAL_PIPE_MARGIN = 15;
+const VERTICAL_PIPE_MARGIN = 15;
+const ROUTING_MARGIN = 25;
+const ANCHOR_OFFSET = 20;
+const TRACK_SPACING = 10;
 
 // ---------------------------------------------------------------------------
 // Type Definitions for Orthogonal Router
@@ -171,7 +143,7 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
       const x = n.x ?? 0;
       const y = n.y ?? 0;
       // Inflate by configured padding
-      const padding = currentConfig.nodePadding;
+      const padding = NODE_PADDING;
 
       return {
         nodeId: n.id,
@@ -719,8 +691,6 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
     }
 
     // 3. Compute Anchors
-    const ANCHOR_OFFSET = currentConfig.anchorOffset;
-
     const pSrcAnchor: Point = { ...pSrcPort };
     const pDstAnchor: Point = { ...pDstPort };
 
@@ -797,12 +767,12 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         const dstX = dst.x ?? 0;
         const goRight = dstX >= pSrcPort.x;
         const detourX = goRight
-          ? obs.maxX + currentConfig.horizontalPipeMargin
-          : obs.minX - currentConfig.horizontalPipeMargin;
+          ? obs.maxX + HORIZONTAL_PIPE_MARGIN
+          : obs.minX - HORIZONTAL_PIPE_MARGIN;
 
         const clearanceY = isBottom
-          ? obs.maxY + currentConfig.verticalPipeMargin
-          : obs.minY - currentConfig.verticalPipeMargin;
+          ? obs.maxY + VERTICAL_PIPE_MARGIN
+          : obs.minY - VERTICAL_PIPE_MARGIN;
 
         pSrcAnchor.x = detourX;
         pSrcAnchor.y = clearanceY;
@@ -831,13 +801,11 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         const isRight = pSrcPort.x > (src.x ?? 0);
         const dstY = dst.y ?? 0;
         const goDown = dstY >= pSrcPort.y;
-        const detourY = goDown
-          ? obs.maxY + currentConfig.verticalPipeMargin
-          : obs.minY - currentConfig.verticalPipeMargin;
+        const detourY = goDown ? obs.maxY + VERTICAL_PIPE_MARGIN : obs.minY - VERTICAL_PIPE_MARGIN;
 
         const clearanceX = isRight
-          ? obs.maxX + currentConfig.horizontalPipeMargin
-          : obs.minX - currentConfig.horizontalPipeMargin;
+          ? obs.maxX + HORIZONTAL_PIPE_MARGIN
+          : obs.minX - HORIZONTAL_PIPE_MARGIN;
 
         const gapX = isRight
           ? Math.min(obs.minX - 2, pSrcPort.x + ANCHOR_OFFSET)
@@ -866,12 +834,12 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         const srcX = src.x ?? 0;
         const goRight = srcX >= pDstPort.x;
         const detourX = goRight
-          ? obs.maxX + currentConfig.horizontalPipeMargin
-          : obs.minX - currentConfig.horizontalPipeMargin;
+          ? obs.maxX + HORIZONTAL_PIPE_MARGIN
+          : obs.minX - HORIZONTAL_PIPE_MARGIN;
 
         const clearanceY = isBottom
-          ? obs.maxY + currentConfig.verticalPipeMargin
-          : obs.minY - currentConfig.verticalPipeMargin;
+          ? obs.maxY + VERTICAL_PIPE_MARGIN
+          : obs.minY - VERTICAL_PIPE_MARGIN;
 
         pDstAnchor.x = detourX;
         pDstAnchor.y = clearanceY;
@@ -887,13 +855,11 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         const isRight = pDstPort.x > (dst.x ?? 0);
         const srcY = src.y ?? 0;
         const goDown = srcY >= pDstPort.y;
-        const detourY = goDown
-          ? obs.maxY + currentConfig.verticalPipeMargin
-          : obs.minY - currentConfig.verticalPipeMargin;
+        const detourY = goDown ? obs.maxY + VERTICAL_PIPE_MARGIN : obs.minY - VERTICAL_PIPE_MARGIN;
 
         const clearanceX = isRight
-          ? obs.maxX + currentConfig.horizontalPipeMargin
-          : obs.minX - currentConfig.horizontalPipeMargin;
+          ? obs.maxX + HORIZONTAL_PIPE_MARGIN
+          : obs.minX - HORIZONTAL_PIPE_MARGIN;
 
         pDstAnchor.x = clearanceX;
         pDstAnchor.y = detourY;
@@ -947,7 +913,7 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
     // `edge-corner-connection` pathology where the prior 5-point U-detour
     // landed endpoints 0.67–3u from a node corner.
     if (srcHandleWaypoints.length === 0 && dstHandleWaypoints.length === 0) {
-      const hpMargin = currentConfig.horizontalPipeMargin;
+      const hpMargin = HORIZONTAL_PIPE_MARGIN;
       const anchorsSameX = Math.abs(pSrcAnchor.x - pDstAnchor.x) < hpMargin;
       const anchorsSameY = Math.abs(pSrcAnchor.y - pDstAnchor.y) < hpMargin;
       const hasPortOffset =
@@ -1041,10 +1007,10 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
 
       if (obsBlocksPath) {
         // Expand bbox to include space for routing around this obstacle
-        bbMinX = Math.min(bbMinX, obs.minX - currentConfig.routingMargin);
-        bbMaxX = Math.max(bbMaxX, obs.maxX + currentConfig.routingMargin);
-        bbMinY = Math.min(bbMinY, obs.minY - currentConfig.routingMargin);
-        bbMaxY = Math.max(bbMaxY, obs.maxY + currentConfig.routingMargin);
+        bbMinX = Math.min(bbMinX, obs.minX - ROUTING_MARGIN);
+        bbMaxX = Math.max(bbMaxX, obs.maxX + ROUTING_MARGIN);
+        bbMinY = Math.min(bbMinY, obs.minY - ROUTING_MARGIN);
+        bbMaxY = Math.max(bbMaxY, obs.maxY + ROUTING_MARGIN);
       }
     }
 
@@ -1056,12 +1022,12 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
       }
       // Add horizontal pipes around obstacle - ONLY at safe zone positions (with margins)
       // Do NOT create pipes at exact boundaries - that allows edges to hug nodes
-      const hMargin = currentConfig.horizontalPipeMargin;
+      const hMargin = HORIZONTAL_PIPE_MARGIN;
       getOrAddPipe('horizontal', obs.minY - hMargin, bbMinX, bbMaxX); // Above obstacle (safe zone)
       getOrAddPipe('horizontal', obs.maxY + hMargin, bbMinX, bbMaxX); // Below obstacle (safe zone)
 
       // Add vertical pipes around obstacle - ONLY at safe zone positions (with margins)
-      const vMargin = currentConfig.verticalPipeMargin;
+      const vMargin = VERTICAL_PIPE_MARGIN;
       getOrAddPipe('vertical', obs.minX - vMargin, bbMinY, bbMaxY); // Left of obstacle (safe zone)
       getOrAddPipe('vertical', obs.maxX + vMargin, bbMinY, bbMaxY); // Right of obstacle (safe zone)
     }
@@ -1308,7 +1274,7 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
       // For LR direction: recalculate detour X using visual extent
       // TB x becomes LR y after transform, so the visual extent should be based on height, not width
       if (isLR) {
-        const margin = currentConfig.verticalPipeMargin;
+        const margin = VERTICAL_PIPE_MARGIN;
         // Find obstacles that block the direct vertical path (caused us to detour)
         // An obstacle blocks the path if its x-range contains the path's x and its y-range overlaps with the path's y-range
         if (wentRight) {
@@ -1424,7 +1390,7 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         }
 
         // Find the obstacle edge closest to destination in the direction we're going
-        const margin = currentConfig.horizontalPipeMargin;
+        const margin = HORIZONTAL_PIPE_MARGIN;
         if (goingDown) {
           // Going down: find the bottom of the lowest obstacle we need to clear
           const lowestObsBottom = Math.max(...filteredObs.map((obs) => obs.maxY));
@@ -2196,7 +2162,6 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
   // -----------------------------------------------------------------------
   // Phase 3: Rebuild Geometry
   // -----------------------------------------------------------------------
-  const TRACK_SPACING = currentConfig.trackSpacing;
   const segmentCoords = new Map<string, number>(); // `${edgeIndex}-${segmentIndex}` -> coord
 
   for (const pipe of pipes) {
