@@ -1,7 +1,4 @@
 import type { LayoutData } from '../../../types.js';
-import { log } from '../../../../logger.js';
-
-const SWIMLANE_DIR_LOG_PREFIX = 'SWIMLANE_DIR';
 
 type LayoutNode = NonNullable<LayoutData['nodes']>[number] & { swimlaneContentTop?: number };
 type Direction = 'LR' | 'RL';
@@ -164,7 +161,7 @@ export function applyLrDirectionTransform(
   layout: LayoutData,
   direction: Direction = 'LR'
 ): boolean {
-  const nodes = layout.nodes ?? [];
+  const nodes = (layout.nodes ?? []) as LayoutNode[];
   const edges = layout.edges ?? [];
   const contentNodes = nodes.filter((n) => !n.isGroup);
 
@@ -197,21 +194,11 @@ export function applyLrDirectionTransform(
   const avgHeight = contentNodes.length > 0 ? totalHeight / contentNodes.length : 50;
   const horizontalScaleFactor = avgHeight > 0 ? Math.max(1, avgWidth / avgHeight) : 1;
 
-  log.debug(
-    `${SWIMLANE_DIR_LOG_PREFIX} LR spacing adjustment: avgWidth=${avgWidth.toFixed(2)}, avgHeight=${avgHeight.toFixed(2)}, scaleFactor=${horizontalScaleFactor.toFixed(2)}`
-  );
-
   for (const n of contentNodes) {
     const x0 = n.x ?? 0;
     const y0 = n.y ?? 0;
     const newX = (y0 - minY) * horizontalScaleFactor + titleBandOffset;
     const newY = x0 - minX;
-
-    if (n.id === 'J' || n.id?.toString().includes('edge-label')) {
-      log.debug(
-        `[SWIMLANE_DEBUG] LR transform for ${n.id}: TB(x=${x0.toFixed(1)}, y=${y0.toFixed(1)}, w=${n.width?.toFixed(1)}, h=${n.height?.toFixed(1)}) -> LR(x=${newX.toFixed(1)}, y=${newY.toFixed(1)})`
-      );
-    }
 
     n.x = newX;
     n.y = newY;
@@ -221,29 +208,17 @@ export function applyLrDirectionTransform(
     if (!e.points) {
       continue;
     }
-    const edgeId = (e as any).id ?? '';
-    const isDebugEdge = edgeId.includes('I_K');
-    if (isDebugEdge) {
-      log.debug(
-        `[SWIMLANE_DEBUG] LR edge transform for ${edgeId}: minX=${minX.toFixed(1)}, minY=${minY.toFixed(1)}, scaleFactor=${horizontalScaleFactor.toFixed(2)}`
-      );
-    }
     for (const p of e.points) {
       const x0 = p.x;
       const y0 = p.y;
       const newX = (y0 - minY) * horizontalScaleFactor + titleBandOffset;
       const newY = x0 - minX;
-      if (isDebugEdge) {
-        log.debug(
-          `[SWIMLANE_DEBUG]   point (${x0.toFixed(1)}, ${y0.toFixed(1)}) -> (${newX.toFixed(1)}, ${newY.toFixed(1)})`
-        );
-      }
       p.x = newX;
       p.y = newY;
     }
   }
 
-  recomputeNestedGroupBounds(nodes as LayoutNode[]);
+  recomputeNestedGroupBounds(nodes);
 
   const laneNodes = nodes.filter((n) => n.isGroup && !n.parentId);
   if (laneNodes.length === 0) {
@@ -253,12 +228,12 @@ export function applyLrDirectionTransform(
     return true;
   }
 
-  const nodeById = buildNodeMap(nodes as LayoutNode[]);
+  const nodeById = buildNodeMap(nodes);
   const childrenByLane = new Map<string, LayoutNode[]>();
   let globalMinXChild = Infinity;
   let globalMaxXChild = -Infinity;
 
-  for (const n of nodes as LayoutNode[]) {
+  for (const n of nodes) {
     if (n.isGroup) {
       continue;
     }
@@ -287,7 +262,7 @@ export function applyLrDirectionTransform(
   }
 
   let maxPad = 0;
-  for (const lane of laneNodes as LayoutNode[]) {
+  for (const lane of laneNodes) {
     const pad = lane.padding ?? 0;
     if (pad > maxPad) {
       maxPad = pad;
@@ -312,7 +287,7 @@ export function applyLrDirectionTransform(
     centerY: number;
   }[] = [];
 
-  for (const lane of laneNodes as LayoutNode[]) {
+  for (const lane of laneNodes) {
     const children = childrenByLane.get(lane.id) ?? [];
     if (children.length === 0) {
       continue;
@@ -379,18 +354,6 @@ export function applyLrDirectionTransform(
   if (direction === 'RL') {
     mirrorX(layout);
   }
-
-  log.debug(SWIMLANE_DIR_LOG_PREFIX, 'Adjusted LR lane bounds after direction transform', {
-    laneCount: laneNodes.length,
-    globalMinXChild,
-    globalMaxXChild,
-    fullContentWidth,
-    laneWidth,
-    centerX,
-    maxPad,
-    minHeaderMargin,
-    verticalMargin,
-  });
 
   return true;
 }
