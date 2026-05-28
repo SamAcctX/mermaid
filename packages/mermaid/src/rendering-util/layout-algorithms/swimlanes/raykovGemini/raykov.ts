@@ -222,33 +222,6 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
     return pipe;
   };
 
-  /**
-   * Get orthogonal port point - returns the CENTER of a cardinal side (left/right/top/bottom).
-   * This ensures the edge starts/ends with a purely horizontal or vertical segment.
-   *
-   * @param node - The node to get the port from
-   * @param target - The target point (used to determine which side)
-   * @param isSource - Whether this is the source node (affects side selection for same-row/column cases)
-   */
-  const getOrthogonalPort = (node: MermaidNode, target: Point, isSource: boolean): Point => {
-    const w = node.width ?? 10;
-    const h = node.height ?? 10;
-    const cx = node.x ?? 0;
-    const cy = node.y ?? 0;
-    const side = chooseOrthogonalSide(node, target, isSource ? 'bottom' : 'top');
-
-    switch (side) {
-      case 'top':
-        return { x: cx, y: cy - h / 2 };
-      case 'bottom':
-        return { x: cx, y: cy + h / 2 };
-      case 'left':
-        return { x: cx - w / 2, y: cy };
-      case 'right':
-        return { x: cx + w / 2, y: cy };
-    }
-  };
-
   // Direct port-for-side helper. Used by Step 6.2's sibling side-split
   // reassignment so the main routing loop can honor a side that does
   // not match `getOrthogonalPort`'s natural choice.
@@ -268,6 +241,17 @@ export function routeEdgesOrthogonal(data: LayoutData, direction?: string): Layo
         return { x: cx + w / 2, y: cy };
     }
   };
+
+  /**
+   * Get orthogonal port point - returns the CENTER of a cardinal side (left/right/top/bottom).
+   * This ensures the edge starts/ends with a purely horizontal or vertical segment.
+   *
+   * @param node - The node to get the port from
+   * @param target - The target point (used to determine which side)
+   * @param isSource - Whether this is the source node (affects side selection for same-row/column cases)
+   */
+  const getOrthogonalPort = (node: MermaidNode, target: Point, isSource: boolean): Point =>
+    portForSide(node, chooseOrthogonalSide(node, target, isSource ? 'bottom' : 'top'));
 
   // Global list of all routed segments for crossing reduction
   const allRoutedSegments: RoutedSegment[] = [];
