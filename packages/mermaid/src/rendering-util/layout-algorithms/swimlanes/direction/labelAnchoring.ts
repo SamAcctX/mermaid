@@ -87,15 +87,13 @@ export function anchorLabelsToPolyline(edges: Edge[], nodeByIdMap: Map<string, N
   // resolveEdgeNodeIntersections historically used for labels.
   const LABEL_PLACEMENT_BUFFER = 3;
 
-  const inflate = (r: RectLite, d: number): RectLite => ({
-    left: r.left - d,
-    right: r.right + d,
-    top: r.top - d,
-    bottom: r.bottom + d,
-  });
-
   const labelOverlapsAnything = (labelId: string, edgeId: string, rect: RectLite): boolean => {
-    const buffered = inflate(rect, LABEL_PLACEMENT_BUFFER);
+    const buffered = {
+      left: rect.left - LABEL_PLACEMENT_BUFFER,
+      right: rect.right + LABEL_PLACEMENT_BUFFER,
+      top: rect.top - LABEL_PLACEMENT_BUFFER,
+      bottom: rect.bottom + LABEL_PLACEMENT_BUFFER,
+    };
     for (const { nodeId, rect: nr } of foreignNodeRects) {
       if (nodeId === labelId) {
         continue;
