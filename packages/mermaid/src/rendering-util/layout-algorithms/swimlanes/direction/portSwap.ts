@@ -5,6 +5,7 @@ import {
   collectRealNodeBounds,
   dedupeConsecutivePoints,
   getNodePairGeometry,
+  samePoint,
   segmentConflictsWithAnyEdge,
   segmentHitsAnyRect,
 } from './geometry.js';
@@ -178,8 +179,8 @@ export function portSwapToLShape(edges: Edge[], nodes: Node[]): void {
 
       // Degenerate: if np1 === np2, the "L" collapses to a straight line.
       // Accept it (even better than a 1-bend L), but keep it as 2 pts.
-      const firstSegDegenerate = Math.abs(np0.x - np1.x) < EPS && Math.abs(np0.y - np1.y) < EPS;
-      const secondSegDegenerate = Math.abs(np1.x - np2.x) < EPS && Math.abs(np1.y - np2.y) < EPS;
+      const firstSegDegenerate = samePoint(np0, np1, EPS);
+      const secondSegDegenerate = samePoint(np1, np2, EPS);
       if (firstSegDegenerate && secondSegDegenerate) {
         continue;
       }
