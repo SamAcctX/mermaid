@@ -1,5 +1,6 @@
 // cspell:ignore Hegemann Kandinsky Siebenhaller
 import type { Edge, Node } from '../../../types.js';
+import { orthogonalSegmentsCross } from './geometry.js';
 
 const EPS = 1e-6;
 const MIN_PORT_SPACING = 8;
@@ -153,45 +154,6 @@ export function straightenCollinearSiblingDetours(edges: Edge[], nodes: Node[]):
     return false;
   };
 
-  const segmentsCrossOrth = (
-    a1: PointLite,
-    b1: PointLite,
-    a2: PointLite,
-    b2: PointLite
-  ): boolean => {
-    const s1H = Math.abs(a1.y - b1.y) < EPS;
-    const s1V = Math.abs(a1.x - b1.x) < EPS;
-    const s2H = Math.abs(a2.y - b2.y) < EPS;
-    const s2V = Math.abs(a2.x - b2.x) < EPS;
-    if ((s1H && s2H) || (s1V && s2V)) {
-      return false;
-    }
-    if (!(s1H || s1V) || !(s2H || s2V)) {
-      return false;
-    }
-    const horiz = s1H ? { a: a1, b: b1 } : { a: a2, b: b2 };
-    const vert = s1V ? { a: a1, b: b1 } : { a: a2, b: b2 };
-    const hY = horiz.a.y;
-    const hX1 = Math.min(horiz.a.x, horiz.b.x);
-    const hX2 = Math.max(horiz.a.x, horiz.b.x);
-    const vX = vert.a.x;
-    const vY1 = Math.min(vert.a.y, vert.b.y);
-    const vY2 = Math.max(vert.a.y, vert.b.y);
-    if (vX < hX1 || vX > hX2 || hY < vY1 || hY > vY2) {
-      return false;
-    }
-    const ix = vX;
-    const iy = hY;
-    const TOL = 1e-6;
-    const matchesHorizEndpoint =
-      (Math.abs(ix - horiz.a.x) < TOL && Math.abs(iy - horiz.a.y) < TOL) ||
-      (Math.abs(ix - horiz.b.x) < TOL && Math.abs(iy - horiz.b.y) < TOL);
-    const matchesVertEndpoint =
-      (Math.abs(ix - vert.a.x) < TOL && Math.abs(iy - vert.a.y) < TOL) ||
-      (Math.abs(ix - vert.b.x) < TOL && Math.abs(iy - vert.b.y) < TOL);
-    return !(matchesHorizEndpoint && matchesVertEndpoint);
-  };
-
   for (const edge of edges) {
     if (edge.isLayoutOnly) {
       continue;
@@ -307,7 +269,7 @@ export function straightenCollinearSiblingDetours(edges: Edge[], nodes: Node[]):
           continue;
         }
         for (let i = 0; i < opts.length - 1; i++) {
-          if (segmentsCrossOrth(shiftedSrc, shiftedDst, opts[i], opts[i + 1])) {
+          if (orthogonalSegmentsCross(shiftedSrc, shiftedDst, opts[i], opts[i + 1], EPS)) {
             introducesCrossing = true;
             break;
           }

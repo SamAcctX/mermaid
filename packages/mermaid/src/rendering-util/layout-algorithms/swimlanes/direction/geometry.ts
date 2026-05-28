@@ -73,6 +73,47 @@ export function segmentBoundsOverlapRect(
   );
 }
 
+export function orthogonalSegmentsCross(
+  a1: Point,
+  b1: Point,
+  a2: Point,
+  b2: Point,
+  epsilon = EPS,
+  endpointTolerance = 1e-6
+): boolean {
+  const s1H = Math.abs(a1.y - b1.y) < epsilon;
+  const s1V = Math.abs(a1.x - b1.x) < epsilon;
+  const s2H = Math.abs(a2.y - b2.y) < epsilon;
+  const s2V = Math.abs(a2.x - b2.x) < epsilon;
+  if ((s1H && s2H) || (s1V && s2V)) {
+    return false;
+  }
+  if (!(s1H || s1V) || !(s2H || s2V)) {
+    return false;
+  }
+
+  const horiz = s1H ? { a: a1, b: b1 } : { a: a2, b: b2 };
+  const vert = s1V ? { a: a1, b: b1 } : { a: a2, b: b2 };
+  const hY = horiz.a.y;
+  const hX1 = Math.min(horiz.a.x, horiz.b.x);
+  const hX2 = Math.max(horiz.a.x, horiz.b.x);
+  const vX = vert.a.x;
+  const vY1 = Math.min(vert.a.y, vert.b.y);
+  const vY2 = Math.max(vert.a.y, vert.b.y);
+  if (vX < hX1 || vX > hX2 || hY < vY1 || hY > vY2) {
+    return false;
+  }
+
+  const matchesHorizEndpoint =
+    (Math.abs(vX - horiz.a.x) < endpointTolerance &&
+      Math.abs(hY - horiz.a.y) < endpointTolerance) ||
+    (Math.abs(vX - horiz.b.x) < endpointTolerance && Math.abs(hY - horiz.b.y) < endpointTolerance);
+  const matchesVertEndpoint =
+    (Math.abs(vX - vert.a.x) < endpointTolerance && Math.abs(hY - vert.a.y) < endpointTolerance) ||
+    (Math.abs(vX - vert.b.x) < endpointTolerance && Math.abs(hY - vert.b.y) < endpointTolerance);
+  return !(matchesHorizEndpoint && matchesVertEndpoint);
+}
+
 function strictlyBetween(value: number, a: number, b: number): boolean {
   const lo = Math.min(a, b);
   const hi = Math.max(a, b);

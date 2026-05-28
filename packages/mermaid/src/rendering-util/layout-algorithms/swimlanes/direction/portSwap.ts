@@ -1,5 +1,6 @@
 // cspell:ignore Battista Eades Eiglsperger Hegemann Kandinsky segs Siebenhaller Tamassia Tollis Fößmeier
 import type { Edge, Node } from '../../../types.js';
+import { orthogonalSegmentsCross } from './geometry.js';
 
 const EPS = 1e-6;
 // δ_s — the Kandinsky port-spacing constant (Fößmeier–Kaufmann 1995;
@@ -78,7 +79,7 @@ interface NodeInfo {
  * Safety (the six guards from the iter-17 plan):
  *   1. Strict bend-count decrease   — enforced by the 4-point → 3-point
  *                                     rewrite.
- *   2. No new edge-edge crossings    — segmentsCrossOrth vs every other
+ *   2. No new edge-edge crossings    — orthogonalSegmentsCross vs every other
  *                                     non-self segment.
  *   3. No new edge-node collisions   — segmentHitsNode (both new segs,
  *                                     excluding src for seg-1 and dst
@@ -157,53 +158,8 @@ export function portSwapToLShape(edges: Edge[], nodes: Node[]): void {
     return false;
   };
 
-  // Axis-aligned segment-crossing detector (perpendicular crossings only,
-  // T-intersections count), same semantics as scoreLayout.segmentsCross
-  // and as the helper embedded in `straightenCollinearSiblingDetours`.
-  const segmentsCrossOrth = (
-    a1: PointLite,
-    b1: PointLite,
-    a2: PointLite,
-    b2: PointLite
-  ): boolean => {
-    const s1H = Math.abs(a1.y - b1.y) < EPS;
-    const s1V = Math.abs(a1.x - b1.x) < EPS;
-    const s2H = Math.abs(a2.y - b2.y) < EPS;
-    const s2V = Math.abs(a2.x - b2.x) < EPS;
-    if ((s1H && s2H) || (s1V && s2V)) {
-      return false;
-    }
-    if (!(s1H || s1V) || !(s2H || s2V)) {
-      return false;
-    }
-    const horiz = s1H ? { a: a1, b: b1 } : { a: a2, b: b2 };
-    const vert = s1V ? { a: a1, b: b1 } : { a: a2, b: b2 };
-    const hY = horiz.a.y;
-    const hX1 = Math.min(horiz.a.x, horiz.b.x);
-    const hX2 = Math.max(horiz.a.x, horiz.b.x);
-    const vX = vert.a.x;
-    const vY1 = Math.min(vert.a.y, vert.b.y);
-    const vY2 = Math.max(vert.a.y, vert.b.y);
-    if (vX < hX1 || vX > hX2 || hY < vY1 || hY > vY2) {
-      return false;
-    }
-    const ix = vX;
-    const iy = hY;
-    const TOL = 1e-6;
-    const matchesHorizEndpoint =
-      (Math.abs(ix - horiz.a.x) < TOL && Math.abs(iy - horiz.a.y) < TOL) ||
-      (Math.abs(ix - horiz.b.x) < TOL && Math.abs(iy - horiz.b.y) < TOL);
-    const matchesVertEndpoint =
-      (Math.abs(ix - vert.a.x) < TOL && Math.abs(iy - vert.a.y) < TOL) ||
-      (Math.abs(ix - vert.b.x) < TOL && Math.abs(iy - vert.b.y) < TOL);
-    if (matchesHorizEndpoint && matchesVertEndpoint) {
-      return false;
-    }
-    return true;
-  };
-
   // Collinear-axis overlap: two segments on the same axis at the same
-  // coordinate with overlapping spans. Not flagged by segmentsCrossOrth
+  // coordinate with overlapping spans. Not flagged by orthogonalSegmentsCross
   // (perpendicular-only) but IS an edge overlap for scoreLayout and for
   // Kandinsky face-capacity (two ports at the same offset on the same
   // face).
@@ -376,7 +332,7 @@ export function portSwapToLShape(edges: Edge[], nodes: Node[]): void {
             continue; // zero-length segment of the other edge
           }
           if (!firstSegDegenerate) {
-            if (segmentsCrossOrth(np0, np1, oa, ob)) {
+            if (orthogonalSegmentsCross(np0, np1, oa, ob, EPS)) {
               conflict = true;
               break;
             }
@@ -386,7 +342,7 @@ export function portSwapToLShape(edges: Edge[], nodes: Node[]): void {
             }
           }
           if (!secondSegDegenerate) {
-            if (segmentsCrossOrth(np1, np2, oa, ob)) {
+            if (orthogonalSegmentsCross(np1, np2, oa, ob, EPS)) {
               conflict = true;
               break;
             }
