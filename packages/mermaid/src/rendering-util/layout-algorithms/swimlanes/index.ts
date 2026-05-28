@@ -12,8 +12,6 @@ import { prepareLayoutForSwimlanes } from './helpers.js';
 import { createEdgeLabelNodes } from './edgeLabelNodes.js';
 import { runSwimlaneLayoutCore } from './layoutCore.js';
 
-const USE_EDGE_LABEL_NODES = true;
-
 export async function render(data4Layout: LayoutData, svg: SVG) {
   const element = svg.select('g') as unknown as D3Selection<SVGElement>;
   insertMarkers(element, data4Layout.markers, data4Layout.type, data4Layout.diagramId);
@@ -24,11 +22,9 @@ export async function render(data4Layout: LayoutData, svg: SVG) {
 
   prepareLayoutForSwimlanes(data4Layout);
 
-  if (USE_EDGE_LABEL_NODES) {
-    const { data: transformedData } = createEdgeLabelNodes(data4Layout);
-    data4Layout.nodes = transformedData.nodes;
-    data4Layout.edges = transformedData.edges;
-  }
+  const { data: transformedData } = createEdgeLabelNodes(data4Layout);
+  data4Layout.nodes = transformedData.nodes;
+  data4Layout.edges = transformedData.edges;
 
   const { groups } = await createGraphWithElements(element, data4Layout);
 

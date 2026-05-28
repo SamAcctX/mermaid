@@ -23,8 +23,6 @@ export interface EdgeLabelTransformResult {
   data: LayoutData;
   /** Map from original edge ID to the label node ID (if created) */
   labelNodeMap: Map<string, string>;
-  /** Map from label node ID to original edge ID */
-  originalEdgeMap: Map<string, string>;
 }
 
 /**
@@ -45,7 +43,6 @@ export interface EdgeLabelTransformResult {
  */
 export function createEdgeLabelNodes(data: LayoutData): EdgeLabelTransformResult {
   const labelNodeMap = new Map<string, string>();
-  const originalEdgeMap = new Map<string, string>();
 
   const nodesToAdd: NonClusterNode[] = [];
   const layoutOnlyEdges: Edge[] = [];
@@ -101,7 +98,6 @@ export function createEdgeLabelNodes(data: LayoutData): EdgeLabelTransformResult
 
     nodesToAdd.push(labelNode);
     labelNodeMap.set(edge.id, labelNodeId);
-    originalEdgeMap.set(labelNodeId, edge.id);
 
     // Stamp the original edge so the router can decompose routing through the
     // label's center when producing a single polyline.
@@ -144,6 +140,5 @@ export function createEdgeLabelNodes(data: LayoutData): EdgeLabelTransformResult
       edges: newEdges,
     },
     labelNodeMap,
-    originalEdgeMap,
   };
 }
