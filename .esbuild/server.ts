@@ -143,6 +143,9 @@ const devExplorerRootAbs = resolve(
   process.env.MERMAID_DEV_EXPLORER_ROOT ?? 'cypress/platform/dev-diagrams'
 );
 
+// Starter content written when a new diagram is created from the Dev Explorer.
+const DEFAULT_NEW_DIAGRAM = `flowchart TD\n  A[Start] --> B[End]\n`;
+
 function toPosixPath(p: string) {
   return p.split(path.sep).join('/');
 }
@@ -361,6 +364,41 @@ async function createServer() {
       void relPath;
     } catch (_e) {
       res.status(400).send('Invalid path');
+    }
+  });
+
+  app.post('/dev/api/file', express.text({ type: '*/*', limit: '1mb' }), async (req, res) => {
+    try {
+      const { absPath, relPath } = resolveWithinDevExplorerRoot(req.query.path);
+      if (!absPath.endsWith('.mmd')) {
+        res.status(400).json({ error: 'Only .mmd files are allowed' });
+        return;
+      }
+
+      // Refuse to overwrite an existing file.
+      try {
+        await fs.access(absPath);
+        res.status(409).json({ error: 'File already exists' });
+        return;
+      } catch {
+        // ENOENT is expected — the file should not exist yet.
+      }
+
+      const content =
+        typeof req.body === 'string' && req.body.length > 0 ? req.body : DEFAULT_NEW_DIAGRAM;
+      await fs.mkdir(path.dirname(absPath), { recursive: true });
+      // 'wx' fails if the file appears between the access() check and now.
+      await fs.writeFile(absPath, content, { encoding: 'utf-8', flag: 'wx' });
+      res.status(201).json({
+        path: relPath,
+        bytes: Buffer.byteLength(content, 'utf-8'),
+      });
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException)?.code === 'EEXIST') {
+        res.status(409).json({ error: 'File already exists' });
+        return;
+      }
+      res.status(400).json({ error: 'Invalid path' });
     }
   });
 

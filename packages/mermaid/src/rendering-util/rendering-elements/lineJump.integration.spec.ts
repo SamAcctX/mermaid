@@ -20,7 +20,7 @@ import { preprocessDiagram } from '../../preprocess.js';
 import { toGraphView, writeBackToLayoutData } from '../layout-algorithms/swimlanes/helpers.js';
 import { sugiyamaLayout } from '../layout-algorithms/swimlanes/pipeline.js';
 import { routeEdgesOrthogonal } from '../layout-algorithms/swimlanes/raykovGemini/raykov.js';
-import { applySwimlaneDirectionTransform } from '../layout-algorithms/swimlanes/direction.js';
+import { postProcessSwimlaneLayout } from '../layout-algorithms/swimlanes/postProcessing.js';
 import { createEdgeLabelNodes } from '../layout-algorithms/swimlanes/edgeLabelNodes.js';
 import { findEdgeIntersections, type EdgeGeom } from './lineJump.js';
 
@@ -140,7 +140,7 @@ async function runSwimlanes(fixture: SizesFixture): Promise<LayoutData> {
   }
 
   routeEdgesOrthogonal(layout, direction);
-  applySwimlaneDirectionTransform(layout, direction);
+  postProcessSwimlaneLayout(layout, direction);
 
   return layout;
 }

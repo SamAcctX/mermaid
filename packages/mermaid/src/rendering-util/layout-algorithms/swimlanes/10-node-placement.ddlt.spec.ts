@@ -117,8 +117,8 @@ describe('Swimlanes DDLT — 10-node-placement.mmd', () => {
     expect(incoming?.points).toBeDefined();
     expect(loopback?.points).toBeDefined();
 
-    const incomingD4Port = incoming!.points.at(-1)!;
-    const loopbackD4Port = loopback!.points[0];
+    const incomingD4Port = incoming!.points!.at(-1)!;
+    const loopbackD4Port = loopback!.points![0];
 
     expect(
       Math.max(

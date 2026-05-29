@@ -34,6 +34,10 @@ export class DevFileExplorer extends LitElement {
     error: { state: true },
     root: { state: true },
     entries: { state: true },
+    creating: { state: true },
+    newName: { state: true },
+    createBusy: { state: true },
+    createError: { state: true },
   };
 
   declare path: string;
@@ -42,6 +46,10 @@ export class DevFileExplorer extends LitElement {
   declare error: string;
   declare root: string;
   declare entries: Entry[];
+  declare creating: boolean;
+  declare newName: string;
+  declare createBusy: boolean;
+  declare createError: string;
 
   constructor() {
     super();
@@ -51,6 +59,10 @@ export class DevFileExplorer extends LitElement {
     this.error = '';
     this.root = '';
     this.entries = [];
+    this.creating = false;
+    this.newName = '';
+    this.createBusy = false;
+    this.createError = '';
   }
 
   createRenderRoot() {
@@ -103,6 +115,57 @@ export class DevFileExplorer extends LitElement {
     }
   }
 
+  #openCreate() {
+    this.newName = '';
+    this.createError = '';
+    this.createBusy = false;
+    this.creating = true;
+  }
+
+  #closeCreate() {
+    if (this.createBusy) return;
+    this.creating = false;
+  }
+
+  async #submitCreate() {
+    const raw = (this.newName ?? '').trim();
+    if (!raw) {
+      this.createError = 'Enter a file name.';
+      return;
+    }
+    if (/[/\\]/.test(raw)) {
+      this.createError = 'Name cannot contain slashes.';
+      return;
+    }
+    const fileName = raw.toLowerCase().endsWith('.mmd') ? raw : `${raw}.mmd`;
+    const relPath = this.path ? `${this.path}/${fileName}` : fileName;
+
+    this.createBusy = true;
+    this.createError = '';
+    try {
+      const url = new URL('/dev/api/file', window.location.origin);
+      url.searchParams.set('path', relPath);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: '',
+      });
+      if (res.status === 409) {
+        this.createError = 'A file with that name already exists.';
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as { path?: string };
+      this.creating = false;
+      // Open the freshly created file in the viewer/editor.
+      this.#emitOpenFile(json.path ?? relPath);
+    } catch (e) {
+      this.createError = e instanceof Error ? e.message : String(e);
+    } finally {
+      this.createBusy = false;
+    }
+  }
+
   render() {
     const segments = pathSegments(this.path);
     const itemLabel = this.entries.length === 1 ? 'item' : 'items';
@@ -140,6 +203,10 @@ export class DevFileExplorer extends LitElement {
           <sl-icon slot="prefix" name="arrow-left"></sl-icon>
           Up
         </sl-button>
+        <sl-button size="small" variant="primary" @click=${() => this.#openCreate()}>
+          <sl-icon slot="prefix" name="file-earmark-plus"></sl-icon>
+          New diagram
+        </sl-button>
       </div>
 
       <div class="content">
@@ -175,6 +242,55 @@ export class DevFileExplorer extends LitElement {
           })}
         </div>
       </div>
+
+      <sl-dialog
+        label="New diagram"
+        ?open=${this.creating}
+        @sl-request-close=${(ev: CustomEvent) => {
+          // Block closing while the request is in flight.
+          if (this.createBusy) {
+            ev.preventDefault();
+            return;
+          }
+          this.creating = false;
+        }}
+      >
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <sl-input
+            autofocus
+            label="File name"
+            placeholder="my-diagram"
+            .value=${this.newName}
+            help-text=${`Created in ${this.path || this.root || 'root'}. ".mmd" is added automatically.`}
+            @sl-input=${(ev: Event) => {
+              this.newName = (ev.target as HTMLInputElement).value;
+              this.createError = '';
+            }}
+            @keydown=${(ev: KeyboardEvent) => {
+              if (ev.key === 'Enter') {
+                ev.preventDefault();
+                void this.#submitCreate();
+              }
+            }}
+          ></sl-input>
+          ${this.createError
+            ? html`<div class="empty" style="color: var(--sl-color-danger-600, #b00020);">
+                ${this.createError}
+              </div>`
+            : nothing}
+        </div>
+        <sl-button slot="footer" variant="default" @click=${() => this.#closeCreate()}>
+          Cancel
+        </sl-button>
+        <sl-button
+          slot="footer"
+          variant="primary"
+          ?loading=${this.createBusy}
+          @click=${() => void this.#submitCreate()}
+        >
+          Create
+        </sl-button>
+      </sl-dialog>
     `;
   }
 }

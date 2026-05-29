@@ -23,6 +23,14 @@ export default defineConfig({
   title: 'Mermaid',
   description: 'Create diagrams and visualizations using text and code.',
   base: '/',
+  vite: {
+    server: {
+      // Allow remote access over Tailscale (e.g. *.ts.net hostnames) in dev.
+      // Vite blocks requests whose Host header isn't allow-listed; a leading
+      // dot matches the domain and all its subdomains.
+      allowedHosts: ['.ts.net'],
+    },
+  },
   markdown: allMarkdownTransformers,
   ignoreDeadLinks: [
     // ignore all localhost links

@@ -205,6 +205,7 @@ export class DevDiagramViewer extends LitElement {
     saveMessage: { state: true },
     sizesSaving: { state: true },
     sizesMessage: { state: true },
+    siblings: { state: true },
   };
 
   declare filePath: string;
@@ -229,6 +230,7 @@ export class DevDiagramViewer extends LitElement {
   declare saveMessage: string;
   declare sizesSaving: boolean;
   declare sizesMessage: string;
+  declare siblings: string[];
 
   #renderSeq = 0;
   #consolePatched = false;
@@ -310,6 +312,7 @@ export class DevDiagramViewer extends LitElement {
     this.saveMessage = '';
     this.sizesSaving = false;
     this.sizesMessage = '';
+    this.siblings = [];
   }
 
   createRenderRoot() {
@@ -329,7 +332,10 @@ export class DevDiagramViewer extends LitElement {
   updated(changed: Map<string, unknown>) {
     if (changed.has('filePath')) {
       void this.#loadAndRender();
+      void this.#loadSiblings();
     } else if (changed.has('sseToken')) {
+      // A file may have been added/removed in the folder — refresh siblings.
+      void this.#loadSiblings();
       // On rebuild events, re-fetch + re-render the currently open diagram.
       if (!this.filePath) return;
       if (this.dirty) {
@@ -353,6 +359,44 @@ export class DevDiagramViewer extends LitElement {
 
   #back() {
     this.dispatchEvent(new CustomEvent('back', { bubbles: true, composed: true }));
+  }
+
+  // Fetch the list of .mmd files in the current file's folder so Prev/Next can
+  // step through them in the same order the explorer shows.
+  async #loadSiblings() {
+    if (!this.filePath) {
+      this.siblings = [];
+      return;
+    }
+    const idx = this.filePath.lastIndexOf('/');
+    const dir = idx === -1 ? '' : this.filePath.slice(0, idx);
+    try {
+      const url = new URL('/dev/api/files', window.location.origin);
+      if (dir) url.searchParams.set('path', dir);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as { entries?: { kind: string; path: string }[] };
+      this.siblings = (json.entries ?? []).filter((e) => e.kind === 'file').map((e) => e.path);
+    } catch {
+      this.siblings = [];
+    }
+  }
+
+  get #siblingIndex() {
+    return this.siblings.indexOf(this.filePath);
+  }
+
+  #go(delta: number) {
+    const idx = this.#siblingIndex;
+    if (idx === -1) return;
+    const target = this.siblings[idx + delta];
+    if (!target) return;
+    if (this.dirty && !window.confirm('Discard unsaved changes and switch diagrams?')) {
+      return;
+    }
+    this.dispatchEvent(
+      new CustomEvent('open-file', { detail: { path: target }, bubbles: true, composed: true })
+    );
   }
 
   #persistSettings() {
@@ -724,8 +768,37 @@ export class DevDiagramViewer extends LitElement {
           <sl-icon slot="prefix" name="arrow-left"></sl-icon>
           Back
         </sl-button>
+        <sl-button-group label="Diagram navigation">
+          <sl-button
+            size="small"
+            variant="default"
+            ?disabled=${this.#siblingIndex <= 0}
+            title="Previous diagram in folder"
+            @click=${() => this.#go(-1)}
+          >
+            <sl-icon slot="prefix" name="chevron-left"></sl-icon>
+            Prev
+          </sl-button>
+          <sl-button
+            size="small"
+            variant="default"
+            ?disabled=${this.#siblingIndex === -1 || this.#siblingIndex >= this.siblings.length - 1}
+            title="Next diagram in folder"
+            @click=${() => this.#go(1)}
+          >
+            Next
+            <sl-icon slot="suffix" name="chevron-right"></sl-icon>
+          </sl-button>
+        </sl-button-group>
         <div style="min-width: 0;">
-          <div class="title">Diagram</div>
+          <div class="title">
+            Diagram
+            ${this.#siblingIndex >= 0 && this.siblings.length > 0
+              ? html`<span class="subtle"
+                  >(${this.#siblingIndex + 1}/${this.siblings.length})</span
+                >`
+              : nothing}
+          </div>
           <div class="path">${this.filePath}</div>
         </div>
         <div class="spacer"></div>
@@ -815,44 +888,6 @@ export class DevDiagramViewer extends LitElement {
               <sl-option value="error">error</sl-option>
               <sl-option value="fatal">fatal</sl-option>
             </sl-select>
-          </div>
-
-          <div class="control">
-            <sl-checkbox
-              size="small"
-              ?checked=${this.useMaxWidth}
-              @sl-change=${(e: any) => {
-                this.useMaxWidth = Boolean(e.target?.checked);
-                this.#persistSettings();
-              }}
-              >useMaxWidth</sl-checkbox
-            >
-          </div>
-
-          <div class="control">
-            <sl-checkbox
-              size="small"
-              ?checked=${this.ignoreCrossLaneEdges}
-              @sl-change=${(e: Event) => {
-                const target = e.target as HTMLInputElement | null;
-                this.ignoreCrossLaneEdges = Boolean(target?.checked);
-                this.#persistSettings();
-              }}
-              >ignoreCrossLaneEdges</sl-checkbox
-            >
-          </div>
-
-          <div class="control">
-            <sl-checkbox
-              size="small"
-              ?checked=${this.optimizeRanksByCrossings}
-              @sl-change=${(e: Event) => {
-                const target = e.target as HTMLInputElement | null;
-                this.optimizeRanksByCrossings = Boolean(target?.checked);
-                this.#persistSettings();
-              }}
-              >optimizeRanksByCrossings</sl-checkbox
-            >
           </div>
         </div>
         ${this.loading ? html`<div class="subtle">rendering…</div>` : nothing}

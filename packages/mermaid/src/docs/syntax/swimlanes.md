@@ -98,16 +98,24 @@ Nodes use flowchart-style shape syntax. The id is written first, and the label i
 
 ```mermaid-example
 swimlanes LR
-  subgraph Team
+  subgraph Intake
     start([Start])
     task[Do work]
+    fix[Fix issues]
+  end
+
+  subgraph Review
     decision{Ready?}
+  end
+
+  subgraph Complete
     done((Done))
   end
 
   start --> task --> decision
   decision -->|Yes| done
-  decision -->|No| task
+  decision -->|No| fix
+  fix --> task
 ```
 
 The most common node forms are:

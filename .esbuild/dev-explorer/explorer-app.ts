@@ -5,7 +5,10 @@ import { registerIconLibrary } from '@shoelace-style/shoelace/dist/utilities/ico
 import '@shoelace-style/shoelace/dist/components/breadcrumb/breadcrumb.js';
 import '@shoelace-style/shoelace/dist/components/breadcrumb-item/breadcrumb-item.js';
 import '@shoelace-style/shoelace/dist/components/button/button.js';
+import '@shoelace-style/shoelace/dist/components/button-group/button-group.js';
 import '@shoelace-style/shoelace/dist/components/icon/icon.js';
+import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';
+import '@shoelace-style/shoelace/dist/components/input/input.js';
 import '@shoelace-style/shoelace/dist/components/split-panel/split-panel.js';
 import '@shoelace-style/shoelace/dist/components/badge/badge.js';
 import '@shoelace-style/shoelace/dist/components/checkbox/checkbox.js';
@@ -131,6 +134,7 @@ export class DevExplorerApp extends LitElement {
               <dev-diagram-viewer
                 .filePath=${this.filePath}
                 .sseToken=${this.sseToken}
+                @open-file=${(e: CustomEvent<{ path: string }>) => this.#openFile(e.detail.path)}
                 @back=${this.#backToExplorer}
               ></dev-diagram-viewer>
             `
