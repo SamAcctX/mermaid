@@ -148,9 +148,7 @@ export const updateNodeBounds = <T extends SVGGraphicsElement>(
   const bbox = element.node()!.getBBox();
   node.width = bbox.width;
   node.height = bbox.height;
-  log.debug('updateNodeBounds: #####################################');
   log.debug('updateNodeBounds:', node.id, node.width, node.height);
-  log.debug('updateNodeBounds: #####################################');
 };
 
 /**

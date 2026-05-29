@@ -73,8 +73,7 @@ export async function drawRect<T extends SVGGraphicsElement>(
       .attr('x', x)
       .attr('y', y)
       .attr('width', totalWidth)
-      .attr('height', totalHeight)
-      .attr('stroke', 'url(#gradient)');
+      .attr('height', totalHeight);
   }
 
   updateNodeBounds(node, rect);

@@ -469,11 +469,10 @@ const divider = (parent, node) => {
 };
 
 const swimlane = async (parent, node) => {
-  log.info('Creating swimlane cluster for ', node.id, node);
   const siteConfig = getConfig();
   const { themeVariables, handDrawnSeed } = siteConfig;
-  const { clusterBkg } = themeVariables;
-  const laneStroke = '#ff0000'; // surfacePeer1 ?? surfacePeer0 ?? clusterBorder;
+  const { clusterBkg, clusterBorder } = themeVariables;
+  const laneStroke = clusterBorder;
 
   const { labelStyles, nodeStyles, borderStyles, backgroundStyles } = styles2String(node);
 
@@ -520,22 +519,10 @@ const swimlane = async (parent, node) => {
     node.diff = -padding;
   }
 
-  log.debug('SWIMLANE_DEBUG label bbox', {
-    id: node.id,
-    label: node.label,
-    bboxHeight: bbox.height,
-    bboxWidth: bbox.width,
-    padding,
-    nodeWidth: node.width,
-    computedWidth: width,
-    isLR,
-  });
-
   const height = node.height;
   const laneTop = node.y - height / 2;
   const laneBottom = node.y + height / 2;
   const laneLeft = node.x - width / 2;
-  const laneRight = node.x + width / 2;
 
   // Top of the content area across all lanes, computed in the swimlanes
   // layout write-back. This is the Y of the highest node in the pool.
@@ -559,18 +546,6 @@ const swimlane = async (parent, node) => {
     const titleWidth = Math.max(desiredTitleSize, bbox.height + 2 * titlePaddingY);
     const bodyX = laneLeft + titleWidth;
     const bodyWidth = Math.max(0, width - titleWidth);
-
-    log.debug('SWIMLANE_DEBUG LR layout metrics', {
-      id: node.id,
-      laneLeft,
-      laneRight,
-      laneTop,
-      laneBottom,
-      titleWidth,
-      bodyX,
-      bodyWidth,
-      height,
-    });
 
     if (node.look === 'handDrawn') {
       // @ts-ignore TODO: Fix rough typings
@@ -640,18 +615,6 @@ const swimlane = async (parent, node) => {
     // headerMaxHeight/titleHeight relationship (and thus by titlePaddingY).
     const bodyY = laneTop + titleHeight;
     const contentHeight = Math.max(0, laneBottom - bodyY);
-
-    log.debug('SWIMLANE_DEBUG TB layout metrics', {
-      id: node.id,
-      laneTop,
-      laneBottom,
-      contentTop,
-      headerMaxHeight,
-      titlePaddingY,
-      desiredTitleSize,
-      titleHeight,
-      contentHeight,
-    });
 
     const x = node.x - width / 2;
 

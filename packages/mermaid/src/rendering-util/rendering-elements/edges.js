@@ -747,7 +747,6 @@ export const insertEdge = function (
   const edgeStyles = Array.isArray(edge.style) ? edge.style : [edge.style];
   let strokeColor = edgeStyles.find((style) => style?.startsWith('stroke:'));
 
-  const libavoidAccepted = edge.__libavoidAccepted === true;
   let animationClass = '';
   if (edge.animate) {
     animationClass = 'edge-animation-fast';
@@ -776,16 +775,9 @@ export const insertEdge = function (
         ' ' +
           strokeClasses +
           (edge.classes ? ' ' + edge.classes : '') +
-          (libavoidAccepted ? ' libavoid-accepted-edge' : '') +
           (animationClass ? ' ' + animationClass : '')
       )
-      .attr(
-        'style',
-        (edgeStyles ? edgeStyles.reduce((acc, style) => acc + ';' + style, '') : '') +
-          (libavoidAccepted
-            ? ';stroke:#ff006e;stroke-width:4px;filter:drop-shadow(0 0 3px rgba(255,0,110,0.7));'
-            : '')
-      );
+      .attr('style', edgeStyles ? edgeStyles.reduce((acc, style) => acc + ';' + style, '') : '');
     let d = svgPath.attr('d');
     svgPath.attr('d', d);
     elem.node().appendChild(svgPath.node());
@@ -806,16 +798,9 @@ export const insertEdge = function (
         ' ' +
           strokeClasses +
           (edge.classes ? ' ' + edge.classes : '') +
-          (libavoidAccepted ? ' libavoid-accepted-edge' : '') +
           (animationClass ? ' ' + animationClass : '')
       )
-      .attr(
-        'style',
-        pathStyle +
-          (libavoidAccepted
-            ? ';stroke:#ff006e;stroke-width:4px;filter:drop-shadow(0 0 3px rgba(255,0,110,0.7));'
-            : '')
-      );
+      .attr('style', pathStyle);
 
     //eslint-disable-next-line @typescript-eslint/prefer-regexp-exec
     strokeColor = pathStyle.match(/stroke:([^;]+)/)?.[1];
@@ -844,7 +829,6 @@ export const insertEdge = function (
 
   // MC Special
   svgPath.attr('data-edge', true);
-  svgPath.attr('data-libavoid-accepted', libavoidAccepted ? 'true' : 'false');
   svgPath.attr('data-et', 'edge');
   svgPath.attr('data-id', edge.id);
   svgPath.attr('data-points', pointsStr);
