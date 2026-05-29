@@ -179,9 +179,10 @@ export const insertEdgeLabel = async (elem, edge) => {
   if (edge.endLabelLeft) {
     // Create the actual text element
     const endEdgeLabelLeft = elem.insert('g').attr('class', 'edgeTerminals');
+    // TODO: Remove? `inner` is not used
     const inner = endEdgeLabelLeft.insert('g').attr('class', 'inner');
     const endLabelElement = await createLabel(
-      inner,
+      endEdgeLabelLeft,
       edge.endLabelLeft,
       getLabelStyles(edge.labelStyle) || '',
       false,
@@ -209,10 +210,11 @@ export const insertEdgeLabel = async (elem, edge) => {
   if (edge.endLabelRight) {
     // Create the actual text element
     const endEdgeLabelRight = elem.insert('g').attr('class', 'edgeTerminals');
+    // TODO: Remove? `inner` is not used
     const inner = endEdgeLabelRight.insert('g').attr('class', 'inner');
 
     const endLabelElement = await createLabel(
-      inner,
+      endEdgeLabelRight,
       edge.endLabelRight,
       getLabelStyles(edge.labelStyle) || '',
       false,
