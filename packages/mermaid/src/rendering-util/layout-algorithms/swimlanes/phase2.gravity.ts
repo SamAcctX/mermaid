@@ -1,5 +1,10 @@
 import type { Graph, Layering, NodeId } from './helpers.js';
-import { topoSortIfAcyclic, normalizeGraph } from './phase0.helpers.js';
+import {
+  buildLayersFromRanks,
+  buildPredecessorSuccessorMaps,
+  topoSortIfAcyclic,
+  normalizeGraph,
+} from './phase0.helpers.js';
 import type { LayeringOptions } from './phase2.options.js';
 import { createTopLaneResolver } from './phase2.options.js';
 import { LAYERING } from './config.js';
@@ -22,24 +27,16 @@ export function assignLayers_Gravity(gAcyclic: Graph, opts?: LayeringOptions): L
 
   const topLaneOf = createTopLaneResolver(g);
 
-  // Precompute predecessors and successors
-  const preds = new Map<NodeId, NodeId[]>();
-  const succs = new Map<NodeId, NodeId[]>();
-  for (const v of g.nodes) {
-    preds.set(v, []);
-    succs.set(v, []);
-  }
-  for (const e of g.edges) {
+  const { preds, succs } = buildPredecessorSuccessorMaps(g, (e) => {
     if (opts?.ignoreCrossLaneEdges) {
       const laneSrc = topLaneOf(e.src);
       const laneDst = topLaneOf(e.dst);
       if (laneSrc && laneDst && laneSrc !== laneDst) {
-        continue;
+        return false;
       }
     }
-    succs.get(e.src)!.push(e.dst);
-    preds.get(e.dst)!.push(e.src);
-  }
+    return true;
+  });
 
   const order = topoSortIfAcyclic(g) ?? [...g.nodes];
   const revOrder = [...order].reverse();
@@ -119,19 +116,7 @@ export function assignLayers_Gravity(gAcyclic: Graph, opts?: LayeringOptions): L
     }
   }
 
-  // Build layers
-  let maxRank = 0;
-  for (const v of g.nodes) {
-    maxRank = Math.max(maxRank, rankOf[v] ?? 0);
-  }
-  const layers: NodeId[][] = Array.from({ length: maxRank + 1 }, () => []);
-  for (const v of order) {
-    const r = Math.max(0, rankOf[v] ?? 0);
-    if (!layers[r]) {
-      layers[r] = [];
-    }
-    layers[r].push(v);
-  }
+  const layers = buildLayersFromRanks(g, order, rankOf);
 
   return { layers, rankOf, dummy: new Set<NodeId>() };
 }

@@ -1,9 +1,13 @@
 import type { Graph, NodeId, EdgeRef } from './helpers.js';
-import { buildLayerIndex, countInversions } from './phase0.helpers.js';
+import {
+  buildLayerIndex,
+  buildPredecessorSuccessorMaps,
+  countInversions,
+} from './phase0.helpers.js';
 import { LAYERING } from './config.js';
 import { createTopLaneResolver } from './phase2.options.js';
 import { buildMultitreeLayerOrder } from './phase2.multitree.order.js';
-// cspell:ignore acyclicity preds succs
+// cspell:ignore acyclicity preds
 
 function countCrossingsBetweenAdjacent(upper: NodeId[], lower: NodeId[], edges: EdgeRef[]): number {
   const upperSet = new Set(upper);
@@ -60,16 +64,7 @@ export function optimizeRanksByCrossings(
   initialRank: Record<NodeId, number>
 ): Record<NodeId, number> {
   const rankOf: Record<NodeId, number> = { ...initialRank } as any;
-  const preds = new Map<NodeId, NodeId[]>();
-  const succs = new Map<NodeId, NodeId[]>();
-  for (const v of g.nodes) {
-    preds.set(v, []);
-    succs.set(v, []);
-  }
-  for (const e of g.edges) {
-    succs.get(e.src)!.push(e.dst);
-    preds.get(e.dst)!.push(e.src);
-  }
+  const { preds } = buildPredecessorSuccessorMaps(g);
 
   const laneOf = createTopLaneResolver(g);
 

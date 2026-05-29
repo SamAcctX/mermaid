@@ -1,5 +1,9 @@
 import type { Graph, NodeId } from './helpers.js';
-import { normalizeGraph, topoSortIfAcyclic } from './phase0.helpers.js';
+import {
+  buildPredecessorSuccessorMaps,
+  normalizeGraph,
+  topoSortIfAcyclic,
+} from './phase0.helpers.js';
 // cspell:ignore preorder postorder preds topo
 
 export interface DrivingTreeBlock {
@@ -26,52 +30,13 @@ export interface DrivingTreeBuildOptions {
   laneOf?: (id: NodeId) => string | null;
 }
 
-/**
- * Builds a "driving tree" - a spanning forest that guides the ordering of nodes within layers.
- *
- * **Purpose:**
- * The driving tree determines the order in which nodes are emitted into layers. By traversing
- * the tree in a specific order (preorder/postorder), we can control the left-to-right ordering
- * of nodes within each layer to minimize edge crossings.
- *
- * **Algorithm:**
- * 1. **Parent Selection:** For each node in topological order, choose one incoming edge as
- *    the "tree edge" (parent). The choice is based on:
- *    - Lane affinity: prefer parents in the same lane
- *    - Rank hints: prefer parents with similar ranks
- *    - Topological order: prefer earlier parents for stability
- *
- * 2. **Forest Construction:** Nodes without parents become roots. The result is a spanning
- *    forest (one or more trees) that covers all nodes.
- *
- * 3. **Biconnected Components:** Compute blocks (biconnected components) to identify
- *    articulation points and bridge edges. This helps with stability and crossing reduction.
- *
- * 4. **Traversal Orders:** Compute preorder, postorder, and topological order for use in
- *    later phases.
- *
- * **Key Insight:**
- * By carefully choosing which edges form the tree, we create a structure that naturally
- * groups related nodes together, reducing crossings when nodes are emitted in tree order.
- *
- * **Time Complexity:** O(n + m) where n = nodes, m = edges
- *
- * @param graph - The input graph
- * @param opts - Options including rank hints and lane information
- * @returns DrivingTree structure with parent/child relationships and traversal orders
- */
+// Build the spanning forest and traversal metadata used by tree ordering.
 export function buildDrivingTree(graph: Graph, opts?: DrivingTreeBuildOptions): DrivingTree {
   const g = normalizeGraph(graph);
   const laneOf = opts?.laneOf ?? (() => null);
   const rankHint = opts?.rankHint;
 
-  const preds = new Map<NodeId, NodeId[]>();
-  for (const node of g.nodes) {
-    preds.set(node, []);
-  }
-  for (const e of g.edges) {
-    preds.get(e.dst)!.push(e.src);
-  }
+  const { preds } = buildPredecessorSuccessorMaps(g);
   for (const arr of preds.values()) {
     arr.sort((a, b) => a.localeCompare(b));
   }

@@ -1,21 +1,20 @@
 import type { Graph, Layering, NodeId } from './helpers.js';
-import { incoming, normalizeGraph, topoSortIfAcyclic } from './phase0.helpers.js';
+import {
+  buildInDegreeMap,
+  buildLayersFromRanks,
+  buildSuccessorMap,
+  incoming,
+  normalizeGraph,
+  topoSortIfAcyclic,
+} from './phase0.helpers.js';
 import type { LayeringOptions } from './phase2.options.js';
 import { createTopLaneResolver } from './phase2.options.js';
 
 // cspell:ignore indeg preds topo
 
 function topoSortByGenerationIfAcyclic(g: Graph): NodeId[] | null {
-  const indeg = new Map<NodeId, number>();
-  const adj = new Map<NodeId, NodeId[]>();
-  for (const v of g.nodes) {
-    indeg.set(v, 0);
-    adj.set(v, []);
-  }
-  for (const e of g.edges) {
-    indeg.set(e.dst, (indeg.get(e.dst) ?? 0) + 1);
-    adj.get(e.src)?.push(e.dst);
-  }
+  const indeg = buildInDegreeMap(g);
+  const adj = buildSuccessorMap(g);
   for (const successors of adj.values()) {
     successors.sort((a, b) => a.localeCompare(b));
   }
@@ -89,20 +88,7 @@ export function assignLayers_LaneAwareCompact(gAcyclic: Graph, opts?: LayeringOp
     nextFree.set(lane, L + 1);
   }
 
-  // Build layers from assigned ranks
-  let maxRank = 0;
-  for (const v of g.nodes) {
-    maxRank = Math.max(maxRank, rankOf[v] ?? 0);
-  }
-  const layers: NodeId[][] = Array.from({ length: maxRank + 1 }, () => []);
-  for (const v of order) {
-    const node = g.nodeById.get(v) as any;
-    if (node?.isGroup) {
-      continue;
-    }
-    const r = Math.max(0, rankOf[v] ?? 0);
-    layers[r].push(v);
-  }
+  const layers = buildLayersFromRanks(g, order, rankOf, { skipGroups: true });
 
   return { layers, rankOf, dummy: new Set<NodeId>() };
 }

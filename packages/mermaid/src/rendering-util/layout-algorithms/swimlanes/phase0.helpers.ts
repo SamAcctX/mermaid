@@ -1,5 +1,5 @@
 import type { Graph, EdgeRef, NodeId } from './helpers.js';
-// cspell:ignore acyclicity topo indeg
+// cspell:ignore acyclicity topo indeg preds succs
 
 // Normalize/validate a Graph view; ensure nodeById exists and edges refer to known nodes
 export function normalizeGraph(g: Graph): Graph {
@@ -32,6 +32,72 @@ export function outgoing(g: Graph, v: NodeId): EdgeRef[] {
   return g.edges.filter((e) => e.src === v);
 }
 
+export function buildSuccessorMap(g: Graph): Map<NodeId, NodeId[]> {
+  const succs = new Map<NodeId, NodeId[]>();
+  for (const v of g.nodes) {
+    succs.set(v, []);
+  }
+  for (const e of g.edges) {
+    succs.get(e.src)!.push(e.dst);
+  }
+  return succs;
+}
+
+export function buildInDegreeMap(g: Graph): Map<NodeId, number> {
+  const indeg = new Map<NodeId, number>();
+  for (const v of g.nodes) {
+    indeg.set(v, 0);
+  }
+  for (const e of g.edges) {
+    indeg.set(e.dst, (indeg.get(e.dst) ?? 0) + 1);
+  }
+  return indeg;
+}
+
+export function buildPredecessorSuccessorMaps(
+  g: Graph,
+  includeEdge: (edge: EdgeRef) => boolean = () => true
+): { preds: Map<NodeId, NodeId[]>; succs: Map<NodeId, NodeId[]> } {
+  const preds = new Map<NodeId, NodeId[]>();
+  const succs = new Map<NodeId, NodeId[]>();
+  for (const v of g.nodes) {
+    preds.set(v, []);
+    succs.set(v, []);
+  }
+  for (const e of g.edges) {
+    if (!includeEdge(e)) {
+      continue;
+    }
+    succs.get(e.src)!.push(e.dst);
+    preds.get(e.dst)!.push(e.src);
+  }
+  return { preds, succs };
+}
+
+export function buildLayersFromRanks(
+  g: Graph,
+  order: NodeId[],
+  rankOf: Record<NodeId, number>,
+  opts?: { skipGroups?: boolean }
+): NodeId[][] {
+  let maxRank = 0;
+  for (const v of g.nodes) {
+    if (opts?.skipGroups && g.nodeById.get(v)?.isGroup) {
+      continue;
+    }
+    maxRank = Math.max(maxRank, rankOf[v] ?? 0);
+  }
+
+  const layers: NodeId[][] = Array.from({ length: maxRank + 1 }, () => []);
+  for (const v of order) {
+    if (opts?.skipGroups && g.nodeById.get(v)?.isGroup) {
+      continue;
+    }
+    layers[Math.max(0, rankOf[v] ?? 0)].push(v);
+  }
+  return layers;
+}
+
 // Detect acyclicity via DFS (white/gray/black sets)
 export function isAcyclic(g: Graph): boolean {
   const color: Record<NodeId, 0 | 1 | 2> = Object.create(null);
@@ -39,13 +105,7 @@ export function isAcyclic(g: Graph): boolean {
     color[v] = 0; // 0 white, 1 gray, 2 black
   }
 
-  const adj = new Map<NodeId, NodeId[]>();
-  for (const v of g.nodes) {
-    adj.set(v, []);
-  }
-  for (const e of g.edges) {
-    adj.get(e.src)!.push(e.dst);
-  }
+  const adj = buildSuccessorMap(g);
 
   const dfs = (u: NodeId): boolean => {
     color[u] = 1; // gray
@@ -72,14 +132,7 @@ export function isAcyclic(g: Graph): boolean {
 
 // Topological sort (Kahn). Returns null if cycles exist.
 export function topoSortIfAcyclic(g: Graph): NodeId[] | null {
-  // Compute in-degrees
-  const indeg = new Map<NodeId, number>();
-  for (const v of g.nodes) {
-    indeg.set(v, 0);
-  }
-  for (const e of g.edges) {
-    indeg.set(e.dst, (indeg.get(e.dst) ?? 0) + 1);
-  }
+  const indeg = buildInDegreeMap(g);
 
   // Initialize queue with zero in-degree nodes
   const queue: NodeId[] = [];
@@ -92,13 +145,7 @@ export function topoSortIfAcyclic(g: Graph): NodeId[] | null {
   queue.sort((a, b) => a.localeCompare(b));
 
   const order: NodeId[] = [];
-  const adj = new Map<NodeId, NodeId[]>();
-  for (const v of g.nodes) {
-    adj.set(v, []);
-  }
-  for (const e of g.edges) {
-    adj.get(e.src)!.push(e.dst);
-  }
+  const adj = buildSuccessorMap(g);
   for (const vs of adj.values()) {
     vs.sort((a, b) => a.localeCompare(b));
   }

@@ -243,48 +243,7 @@ function transposeImprove(
   return best;
 }
 
-/**
- * Orders nodes within each layer to minimize edge crossings using layer-by-layer sweep heuristics.
- *
- * **Algorithm: Layer-by-Layer Sweep (Median Heuristic)**
- *
- * This implements the classic Sugiyama framework Phase 3: vertex ordering within layers.
- * The goal is to minimize the number of edge crossings between adjacent layers.
- *
- * **Process:**
- * 1. **Top-Down Sweep:** For each layer i (from top to bottom):
- *    - Fix layer i-1
- *    - Reorder layer i based on the median of neighbor positions in layer i-1
- *    - Optionally apply transpose improvement (local swaps that reduce crossings)
- *
- * 2. **Bottom-Up Sweep:** For each layer i (from bottom to top):
- *    - Fix layer i+1
- *    - Reorder layer i based on the median of neighbor positions in layer i+1
- *    - Optionally apply transpose improvement
- *
- * 3. **Repeat:** Perform 3 sweeps to converge to a local optimum
- *
- * **Heuristics:**
- * - **Median:** For each node, compute the median position of its neighbors in the adjacent layer.
- *   More stable and often produces better results for sparse graphs.
- *
- * **Transpose Improvement:**
- * After each sweep, try swapping adjacent nodes if it reduces crossings. This is a local
- * optimization that can escape some local minima.
- *
- * **Crossing Count:**
- * Uses an efficient O(m log m) algorithm based on merge-sort inversion counting, where m is
- * the number of edges between two layers.
- *
- * **Time Complexity:** O(sweeps × layers × (n log n + m log m))
- * where n = nodes per layer, m = edges between layers
- *
- * **Note:** This is an NP-hard problem, so we use heuristics to find good (not optimal) solutions.
- *
- * @param layering - The layering from Phase 2 (nodes assigned to layers)
- * @param gWithDummies - Graph with dummy nodes inserted for long edges
- * @returns OrderedLayers with nodes ordered within each layer to minimize crossings
- */
+// Sugiyama phase 3: lane-aware median sweeps plus adjacent transpose improvements.
 export function orderLayers(layering: Layering, gWithDummies: Graph): OrderedLayers {
   // Start with deterministic initial order per layer (preserve given order)
   const layers = layering.layers.map((l) => [...l]);
