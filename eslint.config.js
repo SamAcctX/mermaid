@@ -169,18 +169,17 @@ export default tseslint.config(
     },
   },
   {
-    // Ported layout-algorithm code (swimlanes / ddlt / ipsecCola / layout-utils)
-    // and its supporting helpers were authored against a sibling repo's lint
-    // baseline. Loosen project-strict rules here so we can iterate without
-    // mass-rewriting the algorithms; treat as "draft, internal" code.
+    // TODO(swimlanes): the swimlanes / ddlt / layout-utils layout-algorithm code
+    // was authored against a sibling repo's lint baseline and still trips some
+    // project-strict style rules (mostly in its own spec files). These are
+    // loosened here as tracked tech debt — the intent is to bring this code to
+    // the project lint baseline and remove this override entirely.
+    // The shared production helpers (createGraph.ts, cloneLayoutDataForMeasure.ts,
+    // lineJump.ts) were brought to baseline and removed from this override.
     files: [
       'packages/mermaid/src/rendering-util/layout-algorithms/swimlanes/**',
       'packages/mermaid/src/rendering-util/layout-algorithms/ddlt/**',
-      'packages/mermaid/src/rendering-util/layout-algorithms/ipsecCola/**',
       'packages/mermaid/src/rendering-util/layout-algorithms/layout-utils/**',
-      'packages/mermaid/src/rendering-util/rendering-elements/lineJump*.ts',
-      'packages/mermaid/src/rendering-util/createGraph.ts',
-      'packages/mermaid/src/rendering-util/cloneLayoutDataForMeasure.ts',
     ],
     rules: {
       'no-console': 'off',
