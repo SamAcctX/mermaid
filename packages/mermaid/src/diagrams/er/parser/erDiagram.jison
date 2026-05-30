@@ -259,6 +259,7 @@ attribute
 
 attributeType
     : ATTRIBUTE_WORD { $$=$1; }
+    | ATTRIBUTE_WORD '?' { $$=$1 + $2; }
     ;
 
 attributeName
