@@ -57,6 +57,7 @@ const config: RequiredDeep<MermaidConfig> = {
   },
   class: {
     hideEmptyMembersBox: false,
+    hierarchicalNamespaces: true,
   },
   gantt: {
     ...defaultConfigJson.gantt,
@@ -271,6 +272,26 @@ const config: RequiredDeep<MermaidConfig> = {
   radar: {
     ...defaultConfigJson.radar,
   },
+  railroad: {
+    ...defaultConfigJson.railroad,
+    // Railroad colors and typography derive from the active theme unless explicitly overridden.
+    fontSize: undefined,
+    fontFamily: undefined,
+    terminalFill: undefined,
+    terminalStroke: undefined,
+    terminalTextColor: undefined,
+    nonTerminalFill: undefined,
+    nonTerminalStroke: undefined,
+    nonTerminalTextColor: undefined,
+    lineColor: undefined,
+    markerFill: undefined,
+    commentFill: undefined,
+    commentStroke: undefined,
+    commentTextColor: undefined,
+    specialFill: undefined,
+    specialStroke: undefined,
+    ruleNameColor: undefined,
+  },
   ishikawa: {
     ...defaultConfigJson.ishikawa,
   },
@@ -293,6 +314,9 @@ const config: RequiredDeep<MermaidConfig> = {
   },
   venn: {
     ...defaultConfigJson.venn,
+  },
+  cynefin: {
+    ...defaultConfigJson.cynefin,
   },
 };
 
