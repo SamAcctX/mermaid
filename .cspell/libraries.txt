@@ -79,4 +79,5 @@ unplugin
 unstub
 vite
 vitest
+webtoolz
 Zune
