@@ -730,165 +730,175 @@ export const render = async (
     return points;
   };
 
-  // @ts-ignore - ELK is not typed
-  const elk = new ELK();
-  const element = svg.select('g');
-  // Add the arrowheads to the svg
-  insertMarkers(element, data4Layout.markers, data4Layout.type, data4Layout.diagramId);
+  const prepareLayoutForElk = async () => {
+    // @ts-ignore - ELK is not typed
+    const elk = new ELK();
+    const element = svg.select('g');
+    // Add the arrowheads to the svg
+    insertMarkers(element, data4Layout.markers, data4Layout.type, data4Layout.diagramId);
 
-  // Setup the graph with the layout options and the data for the layout
-  let elkGraph: any = {
-    id: 'root',
-    layoutOptions: {
-      'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-      'elk.algorithm': algorithm,
-      'nodePlacement.strategy': data4Layout.config.elk?.nodePlacementStrategy,
-      'elk.layered.mergeEdges': data4Layout.config.elk?.mergeEdges,
-      'elk.direction': 'DOWN',
-      'spacing.baseValue': 40,
-      'elk.layered.crossingMinimization.forceNodeModelOrder':
-        data4Layout.config.elk?.forceNodeModelOrder,
-      'elk.layered.considerModelOrder.strategy': data4Layout.config.elk?.considerModelOrder,
-      'elk.layered.unnecessaryBendpoints': true,
-      'elk.layered.cycleBreaking.strategy': data4Layout.config.elk?.cycleBreakingStrategy,
+    // Setup the graph with the layout options and the data for the layout
+    let elkGraph: any = {
+      id: 'root',
+      layoutOptions: {
+        'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+        'elk.algorithm': algorithm,
+        'nodePlacement.strategy': data4Layout.config.elk?.nodePlacementStrategy,
+        'elk.layered.mergeEdges': data4Layout.config.elk?.mergeEdges,
+        'elk.direction': 'DOWN',
+        'spacing.baseValue': 40,
+        'elk.layered.crossingMinimization.forceNodeModelOrder':
+          data4Layout.config.elk?.forceNodeModelOrder,
+        'elk.layered.considerModelOrder.strategy': data4Layout.config.elk?.considerModelOrder,
+        'elk.layered.unnecessaryBendpoints': true,
+        'elk.layered.cycleBreaking.strategy': data4Layout.config.elk?.cycleBreakingStrategy,
 
-      // 'elk.layered.cycleBreaking.strategy': 'GREEDY_MODEL_ORDER',
-      // 'elk.layered.cycleBreaking.strategy': 'MODEL_ORDER',
-      // 'spacing.nodeNode': 20,
-      // 'spacing.nodeNodeBetweenLayers': 25,
-      // 'spacing.edgeNode': 20,
-      // 'spacing.edgeNodeBetweenLayers': 10,
-      // 'spacing.edgeEdge': 10,
-      // 'spacing.edgeEdgeBetweenLayers': 20,
-      // 'spacing.nodeSelfLoop': 20,
+        // 'elk.layered.cycleBreaking.strategy': 'GREEDY_MODEL_ORDER',
+        // 'elk.layered.cycleBreaking.strategy': 'MODEL_ORDER',
+        // 'spacing.nodeNode': 20,
+        // 'spacing.nodeNodeBetweenLayers': 25,
+        // 'spacing.edgeNode': 20,
+        // 'spacing.edgeNodeBetweenLayers': 10,
+        // 'spacing.edgeEdge': 10,
+        // 'spacing.edgeEdgeBetweenLayers': 20,
+        // 'spacing.nodeSelfLoop': 20,
 
-      // Tweaking options
-      // 'nodePlacement.favorStraightEdges': true,
-      // 'elk.layered.nodePlacement.favorStraightEdges': true,
-      // 'nodePlacement.feedbackEdges': true,
-      'elk.layered.wrapping.multiEdge.improveCuts': true,
-      'elk.layered.wrapping.multiEdge.improveWrappedEdges': true,
-      // 'elk.layered.wrapping.strategy': 'MULTI_EDGE',
-      // 'elk.layered.wrapping.strategy': 'SINGLE_EDGE',
-      'elk.layered.edgeRouting.selfLoopDistribution': 'EQUALLY',
-      'elk.layered.mergeHierarchyEdges': true,
+        // Tweaking options
+        // 'nodePlacement.favorStraightEdges': true,
+        // 'elk.layered.nodePlacement.favorStraightEdges': true,
+        // 'nodePlacement.feedbackEdges': true,
+        'elk.layered.wrapping.multiEdge.improveCuts': true,
+        'elk.layered.wrapping.multiEdge.improveWrappedEdges': true,
+        // 'elk.layered.wrapping.strategy': 'MULTI_EDGE',
+        // 'elk.layered.wrapping.strategy': 'SINGLE_EDGE',
+        'elk.layered.edgeRouting.selfLoopDistribution': 'EQUALLY',
+        'elk.layered.mergeHierarchyEdges': true,
 
-      // 'elk.layered.feedbackEdges': true,
-      // 'elk.layered.crossingMinimization.semiInteractive': true,
-      // 'elk.layered.edgeRouting.splines.sloppy.layerSpacingFactor': 1,
-      // 'elk.layered.edgeRouting.polyline.slopedEdgeZoneWidth': 4.0,
-      // 'elk.layered.wrapping.validify.strategy': 'LOOK_BACK',
-      // 'elk.insideSelfLoops.activate': true,
-      // 'elk.separateConnectedComponents': true,
-      // 'elk.alg.layered.options.EdgeStraighteningStrategy': 'NONE',
-      // 'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES', // NODES_AND_EDGES
-      // 'elk.layered.considerModelOrder.strategy': 'EDGES', // NODES_AND_EDGES
-      // 'elk.layered.wrapping.cutting.strategy': 'ARD', // NODES_AND_EDGES
-    },
-    children: [],
-    edges: [],
+        // 'elk.layered.feedbackEdges': true,
+        // 'elk.layered.crossingMinimization.semiInteractive': true,
+        // 'elk.layered.edgeRouting.splines.sloppy.layerSpacingFactor': 1,
+        // 'elk.layered.edgeRouting.polyline.slopedEdgeZoneWidth': 4.0,
+        // 'elk.layered.wrapping.validify.strategy': 'LOOK_BACK',
+        // 'elk.insideSelfLoops.activate': true,
+        // 'elk.separateConnectedComponents': true,
+        // 'elk.alg.layered.options.EdgeStraighteningStrategy': 'NONE',
+        // 'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES', // NODES_AND_EDGES
+        // 'elk.layered.considerModelOrder.strategy': 'EDGES', // NODES_AND_EDGES
+        // 'elk.layered.wrapping.cutting.strategy': 'ARD', // NODES_AND_EDGES
+      },
+      children: [],
+      edges: [],
+    };
+
+    log.info('Drawing flowchart using v4 renderer', elk);
+
+    // Set the direction of the graph based on the parsed information
+    const dir = data4Layout.direction ?? 'DOWN';
+    elkGraph.layoutOptions['elk.direction'] = dir2ElkDirection(dir);
+
+    // Create the lookup db for the subgraphs and their children to used when creating
+    // the tree structured graph
+    const parentLookupDb: any = addSubGraphs(data4Layout.nodes);
+
+    // Add elements in the svg to be used to hold the subgraphs container
+    // elements and the nodes
+    const subGraphsEl = svg.insert('g').attr('class', 'subgraphs');
+
+    const nodeEl = svg.insert('g').attr('class', 'nodes');
+
+    // Add the nodes to the graph, this will entail creating the actual nodes
+    // in order to get the size of the node. You can't get the size of a node
+    // that is not in the dom so we need to add it to the dom, get the size
+    // we will position the nodes when we get the layout from elkjs
+    elkGraph = await addVertices(nodeEl, data4Layout.nodes, elkGraph);
+    // Time for the edges, we start with adding an element in the node to hold the edges
+    const edgesEl = svg.insert('g').attr('class', 'edges edgePaths');
+
+    // Add the edges to the elk graph, this will entail creating the actual edges
+    elkGraph = await addEdges(data4Layout, elkGraph, svg);
+
+    // Iterate through all nodes and add the top level nodes to the graph
+    const nodes = data4Layout.nodes;
+    nodes.forEach((n: { id: string | number }) => {
+      const node = nodeDb[n.id];
+
+      // Subgraph
+      if (parentLookupDb.childrenById[node.id] !== undefined) {
+        // Set label and adjust node width separately (avoid side effects in labels array)
+        node.labels = [
+          {
+            text: node.label,
+            width: node?.labelData?.width ?? 50,
+            height: node?.labelData?.height ?? 50,
+          },
+        ];
+        node.width = node.width + 2 * node.padding;
+        log.debug('UIO node label', node?.labelData?.width, node.padding);
+        node.layoutOptions = buildSubgraphLayoutOptions(node, data4Layout.config.elk, algorithm);
+        delete node.x;
+        delete node.y;
+        delete node.width;
+        delete node.height;
+      }
+    });
+    log.debug('APA01 processing edges, count:', elkGraph.edges.length);
+    elkGraph.edges.forEach((edge: any, index: number) => {
+      log.debug('APA01 processing edge', index, ':', edge);
+      const source = edge.sources[0];
+      const target = edge.targets[0];
+      log.debug('APA01 source:', source, 'target:', target);
+      log.debug('APA01 nodeDb[source]:', nodeDb[source]);
+      log.debug('APA01 nodeDb[target]:', nodeDb[target]);
+
+      if (nodeDb[source] && nodeDb[target] && nodeDb[source].parentId !== nodeDb[target].parentId) {
+        const ancestorId = findCommonAncestor(source, target, parentLookupDb);
+        // an edge that breaks a subgraph has been identified, set configuration accordingly
+        setIncludeChildrenPolicy(source, ancestorId);
+        setIncludeChildrenPolicy(target, ancestorId);
+      }
+    });
+
+    log.debug('APA01 before');
+    log.debug('APA01 elkGraph structure:', JSON.stringify(elkGraph, null, 2));
+    log.debug('APA01 elkGraph.children length:', elkGraph.children?.length);
+    log.debug('APA01 elkGraph.edges length:', elkGraph.edges?.length);
+
+    // Validate that all edge references exist as nodes
+    elkGraph.edges?.forEach((edge: any, index: number) => {
+      log.debug(`APA01 validating edge ${index}:`, edge);
+      if (edge.sources) {
+        edge.sources.forEach((sourceId: any) => {
+          const sourceExists = elkGraph.children?.some((child: any) => child.id === sourceId);
+          log.debug(`APA01 source ${sourceId} exists:`, sourceExists);
+        });
+      }
+      if (edge.targets) {
+        edge.targets.forEach((targetId: any) => {
+          const targetExists = elkGraph.children?.some((child: any) => child.id === targetId);
+          log.debug(`APA01 target ${targetId} exists:`, targetExists);
+        });
+      }
+    });
+
+    return { elk, elkGraph, parentLookupDb, subGraphsEl, edgesEl };
   };
 
-  log.info('Drawing flowchart using v4 renderer', elk);
-
-  // Set the direction of the graph based on the parsed information
-  const dir = data4Layout.direction ?? 'DOWN';
-  elkGraph.layoutOptions['elk.direction'] = dir2ElkDirection(dir);
-
-  // Create the lookup db for the subgraphs and their children to used when creating
-  // the tree structured graph
-  const parentLookupDb: any = addSubGraphs(data4Layout.nodes);
-
-  // Add elements in the svg to be used to hold the subgraphs container
-  // elements and the nodes
-  const subGraphsEl = svg.insert('g').attr('class', 'subgraphs');
-
-  const nodeEl = svg.insert('g').attr('class', 'nodes');
-
-  // Add the nodes to the graph, this will entail creating the actual nodes
-  // in order to get the size of the node. You can't get the size of a node
-  // that is not in the dom so we need to add it to the dom, get the size
-  // we will position the nodes when we get the layout from elkjs
-  elkGraph = await addVertices(nodeEl, data4Layout.nodes, elkGraph);
-  // Time for the edges, we start with adding an element in the node to hold the edges
-  const edgesEl = svg.insert('g').attr('class', 'edges edgePaths');
-
-  // Add the edges to the elk graph, this will entail creating the actual edges
-  elkGraph = await addEdges(data4Layout, elkGraph, svg);
-
-  // Iterate through all nodes and add the top level nodes to the graph
-  const nodes = data4Layout.nodes;
-  nodes.forEach((n: { id: string | number }) => {
-    const node = nodeDb[n.id];
-
-    // Subgraph
-    if (parentLookupDb.childrenById[node.id] !== undefined) {
-      // Set label and adjust node width separately (avoid side effects in labels array)
-      node.labels = [
-        {
-          text: node.label,
-          width: node?.labelData?.width ?? 50,
-          height: node?.labelData?.height ?? 50,
-        },
-      ];
-      node.width = node.width + 2 * node.padding;
-      log.debug('UIO node label', node?.labelData?.width, node.padding);
-      node.layoutOptions = buildSubgraphLayoutOptions(node, data4Layout.config.elk, algorithm);
-      delete node.x;
-      delete node.y;
-      delete node.width;
-      delete node.height;
+  const runElkLayoutCore = async ({ elk, elkGraph }: any) => {
+    try {
+      const graph = await elk.layout(elkGraph);
+      log.debug('APA01 after - success');
+      log.info('APA01 layout result:', JSON.stringify(graph, null, 2));
+      return graph;
+    } catch (error) {
+      log.error('APA01 ELK layout error:', error);
+      log.error('APA01 elkGraph that caused error:', JSON.stringify(elkGraph, null, 2));
+      throw error;
     }
-  });
-  log.debug('APA01 processing edges, count:', elkGraph.edges.length);
-  elkGraph.edges.forEach((edge: any, index: number) => {
-    log.debug('APA01 processing edge', index, ':', edge);
-    const source = edge.sources[0];
-    const target = edge.targets[0];
-    log.debug('APA01 source:', source, 'target:', target);
-    log.debug('APA01 nodeDb[source]:', nodeDb[source]);
-    log.debug('APA01 nodeDb[target]:', nodeDb[target]);
+  };
 
-    if (nodeDb[source] && nodeDb[target] && nodeDb[source].parentId !== nodeDb[target].parentId) {
-      const ancestorId = findCommonAncestor(source, target, parentLookupDb);
-      // an edge that breaks a subgraph has been identified, set configuration accordingly
-      setIncludeChildrenPolicy(source, ancestorId);
-      setIncludeChildrenPolicy(target, ancestorId);
-    }
-  });
-
-  log.debug('APA01 before');
-  log.debug('APA01 elkGraph structure:', JSON.stringify(elkGraph, null, 2));
-  log.debug('APA01 elkGraph.children length:', elkGraph.children?.length);
-  log.debug('APA01 elkGraph.edges length:', elkGraph.edges?.length);
-
-  // Validate that all edge references exist as nodes
-  elkGraph.edges?.forEach((edge: any, index: number) => {
-    log.debug(`APA01 validating edge ${index}:`, edge);
-    if (edge.sources) {
-      edge.sources.forEach((sourceId: any) => {
-        const sourceExists = elkGraph.children?.some((child: any) => child.id === sourceId);
-        log.debug(`APA01 source ${sourceId} exists:`, sourceExists);
-      });
-    }
-    if (edge.targets) {
-      edge.targets.forEach((targetId: any) => {
-        const targetExists = elkGraph.children?.some((child: any) => child.id === targetId);
-        log.debug(`APA01 target ${targetId} exists:`, targetExists);
-      });
-    }
-  });
-
-  let g;
-  try {
-    g = await elk.layout(elkGraph);
-    log.debug('APA01 after - success');
-    log.info('APA01 layout result:', JSON.stringify(g, null, 2));
-  } catch (error) {
-    log.error('APA01 ELK layout error:', error);
-    log.error('APA01 elkGraph that caused error:', JSON.stringify(elkGraph, null, 2));
-    throw error;
-  }
+  const preparedLayout = await prepareLayoutForElk();
+  const { parentLookupDb, subGraphsEl, edgesEl } = preparedLayout;
+  const g = await runElkLayoutCore(preparedLayout);
 
   // debugger;
   await drawNodes(0, 0, g.children, svg, subGraphsEl, 0);
