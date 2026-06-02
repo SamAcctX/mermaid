@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LayoutData, Edge, Node } from '../../types.js';
 import type { CommonLayoutMeasure, CommonLayoutRenderContext } from './index.js';
 
+interface PreparedLayout {
+  graph: string;
+}
+
 const mocks = vi.hoisted(() => {
   const callOrder: string[] = [];
   const labelElement = { attr: vi.fn() };
@@ -187,30 +191,37 @@ describe('createCommonLayoutRenderer', () => {
     const measured = measure();
     const options = { algorithm: 'elk.layered' };
     const positions = { A: { x: 1, y: 2 } };
-    const seenContexts: CommonLayoutRenderContext[] = [];
+    const preparedLayout: PreparedLayout = { graph: 'prepared-layout' };
+    const seenContexts: CommonLayoutRenderContext<PreparedLayout>[] = [];
 
-    const render = createCommonLayoutRenderer<string>({
+    const render = createCommonLayoutRenderer<string, PreparedLayout>({
       prepareLayout: (_layoutData, context) => {
+        expect(context.preparedLayout).toBeUndefined();
         seenContexts.push(context);
         mocks.callOrder.push('prepare');
+        return preparedLayout;
       },
       measureLayout: (_layoutData, context) => {
+        expect(context.preparedLayout).toBe(preparedLayout);
         seenContexts.push(context);
         mocks.callOrder.push('measure');
         return Promise.resolve(measured);
       },
       runLayoutCore: (_layoutData, context) => {
+        expect(context.preparedLayout).toBe(preparedLayout);
         seenContexts.push(context);
         mocks.callOrder.push('core');
         return 'core-result';
       },
       paintLayout: (_layoutData, context, coreResult) => {
         expect(context.measure).toBe(measured);
+        expect(context.preparedLayout).toBe(preparedLayout);
         expect(coreResult).toBe('core-result');
         mocks.callOrder.push('paint');
       },
       afterPaint: (_layoutData, context, coreResult) => {
         expect(context.measure).toBe(measured);
+        expect(context.preparedLayout).toBe(preparedLayout);
         expect(coreResult).toBe('core-result');
         mocks.callOrder.push('after');
       },
@@ -241,6 +252,7 @@ describe('createCommonLayoutRenderer', () => {
       expect(context.element).toBe(element);
       expect(context.options).toBe(options);
       expect(context.positions).toBe(positions);
+      expect(context.preparedLayout).toBe(preparedLayout);
     }
   });
 });
@@ -261,7 +273,7 @@ describe('defaultMeasureLayout', () => {
 describe('paintLayoutData', () => {
   it('paints clusters and nodes, skips layout-only/skipped edges, and forwards skipIntersect', async () => {
     const { paintLayoutData } = await import('./index.js');
-    const group = node('G', { isGroup: true, shape: 'rectWithTitle' });
+    const group = node('G', { isGroup: true, shape: 'roundedWithTitle' });
     const nodeA = node('A');
     const nodeB = node('B');
     const renderEdge = edge('render');

@@ -34,14 +34,16 @@ interface EdgeRenderPaths {
   updatedPath?: EdgeRenderPath;
 }
 
-export interface CommonLayoutRenderContext {
+export interface CommonLayoutRenderContext<PreparedLayout = unknown> {
   element: D3Selection<SVGElement>;
   helpers?: InternalHelpers;
   options?: RenderOptions;
   positions?: Positions;
+  preparedLayout?: PreparedLayout;
 }
 
-export interface CommonLayoutPaintContext extends CommonLayoutRenderContext {
+export interface CommonLayoutPaintContext<PreparedLayout = unknown>
+  extends CommonLayoutRenderContext<PreparedLayout> {
   measure: CommonLayoutMeasure;
 }
 
@@ -50,40 +52,40 @@ export interface CommonLayoutPaintOptions {
   skipIntersect?: boolean | ((edge: Edge) => boolean);
 }
 
-export interface CommonLayoutRendererDefinition<CoreResult = unknown> {
+export interface CommonLayoutRendererDefinition<CoreResult = unknown, PreparedLayout = void> {
   prepareLayout?: (
     data4Layout: LayoutData,
-    context: CommonLayoutRenderContext
-  ) => void | Promise<void>;
+    context: CommonLayoutRenderContext<PreparedLayout>
+  ) => PreparedLayout | Promise<PreparedLayout>;
   measureLayout?: (
     data4Layout: LayoutData,
-    context: CommonLayoutRenderContext
+    context: CommonLayoutRenderContext<PreparedLayout>
   ) => Promise<CommonLayoutMeasure>;
   runLayoutCore: (
     data4Layout: LayoutData,
-    context: CommonLayoutRenderContext
+    context: CommonLayoutRenderContext<PreparedLayout>
   ) => CoreResult | Promise<CoreResult>;
   paintLayout?: (
     data4Layout: LayoutData,
-    context: CommonLayoutPaintContext,
+    context: CommonLayoutPaintContext<PreparedLayout>,
     coreResult: CoreResult
   ) => void | Promise<void>;
   afterPaint?: (
     data4Layout: LayoutData,
-    context: CommonLayoutPaintContext,
+    context: CommonLayoutPaintContext<PreparedLayout>,
     coreResult: CoreResult
   ) => void | Promise<void>;
   paintOptions?: CommonLayoutPaintOptions;
 }
 
-export function createCommonLayoutRenderer<CoreResult = unknown>({
+export function createCommonLayoutRenderer<CoreResult = unknown, PreparedLayout = void>({
   prepareLayout,
   measureLayout = defaultMeasureLayout,
   runLayoutCore,
   paintLayout,
   afterPaint,
   paintOptions,
-}: CommonLayoutRendererDefinition<CoreResult>) {
+}: CommonLayoutRendererDefinition<CoreResult, PreparedLayout>) {
   return async function render(
     data4Layout: LayoutData,
     svg: SVG,
@@ -95,12 +97,17 @@ export function createCommonLayoutRenderer<CoreResult = unknown>({
     insertMarkers(element, data4Layout.markers, data4Layout.type, data4Layout.diagramId);
     clearLayoutRenderState();
 
-    const renderContext: CommonLayoutRenderContext = { element, helpers, options, positions };
-    await prepareLayout?.(data4Layout, renderContext);
+    const renderContext: CommonLayoutRenderContext<PreparedLayout> = {
+      element,
+      helpers,
+      options,
+      positions,
+    };
+    renderContext.preparedLayout = await prepareLayout?.(data4Layout, renderContext);
 
     const measure = await measureLayout(data4Layout, renderContext);
     const coreResult = await runLayoutCore(data4Layout, renderContext);
-    const paintContext: CommonLayoutPaintContext = { ...renderContext, measure };
+    const paintContext: CommonLayoutPaintContext<PreparedLayout> = { ...renderContext, measure };
 
     if (paintLayout) {
       await paintLayout(data4Layout, paintContext, coreResult);
