@@ -165,6 +165,9 @@
     "report-dir": "coverage/cypress"
   },
   "pnpm": {
+    "overrides": {
+      "dependency-tree": "11.4.3"
+    },
     "patchedDependencies": {
       "roughjs": "patches/roughjs.patch"
     },
