@@ -1,5 +1,5 @@
 import { getConfig } from '../../diagram-api/diagramAPI.js';
-import type { DiagramStyleClassDef } from '../../diagram-api/types.js';
+import type { DiagramStyleClassDef, Positions } from '../../diagram-api/types.js';
 import { log } from '../../logger.js';
 import { getDiagramElement } from '../../rendering-util/insertElementsForSize.js';
 import { getRegisteredLayoutAlgorithm, render } from '../../rendering-util/render.js';
@@ -19,7 +19,7 @@ export const draw = async function (
   id: string,
   _version: string,
   diag: any,
-  positions: any
+  positions?: Positions
 ) {
   log.info('REF0:');
   log.info('Drawing state diagram (v2)', id);
