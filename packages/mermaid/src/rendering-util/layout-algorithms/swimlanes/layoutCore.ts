@@ -34,6 +34,9 @@ export function runSwimlaneLayoutCore(data4Layout: LayoutData): SwimlaneDirectio
   });
   writeBackToLayoutData(g, ordered, coordinates, { nodeGap, layerGap });
 
+  // The layout phases above position nodes only; they do not emit edge routing.
+  // Reset any edge points carried on the input so routeEdgesOrthogonal below is
+  // the single source of truth for swimlane edge geometry.
   for (const edge of data4Layout.edges ?? []) {
     delete edge.points;
   }

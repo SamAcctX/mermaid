@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Graph, EdgeRef, NodeId, OrderedLayers } from '../helpers.js';
-import { assignLayers_LongestPath } from '../phase2.longestPath.js';
-import { makeProperLayering } from '../phase2.dummies.js';
 import { assignCoordinates } from '../phase4.coordinates.js';
-import { mergeDummies } from '../phase4.mergeDummies.js';
 
 interface TestNode {
   id: string;
@@ -41,40 +38,5 @@ describe('Phase 4 — Coordinate Assignment', () => {
     expect(coords.x.A).toBe(-50);
     expect(coords.x.B).toBe(0);
     expect(coords.x.C).toBe(50);
-  });
-
-  it('Long multi-dummy edge yields near-vertical interior polyline points after mergeDummies', () => {
-    // A->B->C->D plus long A->D (edge id e3)
-    const g = mkGraph(
-      ['A', 'B', 'C', 'D'],
-      [
-        ['A', 'B'],
-        ['B', 'C'],
-        ['C', 'D'],
-        ['A', 'D'],
-      ]
-    );
-    const layering = assignLayers_LongestPath(g);
-    const { layering: proper, graphWithDummies } = makeProperLayering(layering, g);
-    const ordered: OrderedLayers = { layers: proper.layers };
-
-    const coords0 = assignCoordinates(ordered, graphWithDummies, {
-      nodeGap: 40,
-      layerGap: 100,
-    });
-    const coords = mergeDummies(coords0, graphWithDummies, g);
-
-    const pts = coords.edgePoints?.e3;
-    expect(pts).toBeTruthy();
-    // interior points (excluding endpoints) should share same x for vertical chain
-    const xs = (pts ?? []).slice(1, -1).map((p) => p.x);
-    if (xs.length > 1) {
-      for (let i = 1; i < xs.length; i++) {
-        expect(xs[i]).toBe(xs[0]);
-      }
-    } else {
-      // at least one dummy should exist
-      expect(xs.length).toBeGreaterThan(0);
-    }
   });
 });

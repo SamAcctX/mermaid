@@ -38,7 +38,6 @@ export interface OrderedLayers {
 export interface Coordinates {
   x: Record<NodeId, number>;
   y: Record<NodeId, number>;
-  edgePoints?: Record<EdgeId, { x: number; y: number }[]>;
 }
 
 export type Edge = EdgeRef;
@@ -300,15 +299,6 @@ export function writeBackToLayoutData(
             lane.width = w;
           }
         }
-      }
-    }
-  }
-
-  if (coords.edgePoints) {
-    for (const [eid, points] of Object.entries(coords.edgePoints)) {
-      const edge = (layout.edges ?? []).find((e) => e.id === eid);
-      if (edge) {
-        edge.points = points;
       }
     }
   }

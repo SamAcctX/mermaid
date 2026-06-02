@@ -7,7 +7,6 @@ import { assignLayers_LaneAwareCompact } from './phase2.laneAwareCompact.js';
 import { makeProperLayering } from './phase2.dummies.js';
 import { orderLayers } from './phase3.ordering.js';
 import { assignCoordinates } from './phase4.coordinates.js';
-import { mergeDummies } from './phase4.mergeDummies.js';
 import { LAYERING } from './config.js';
 
 export interface LayoutOptions {
@@ -56,12 +55,11 @@ export function sugiyamaLayout(g: Graph, opts?: LayoutOptions): LayoutResult {
   const ordered = orderLayers(properLayering, graphWithDummies);
 
   // Phase 4: coordinates
-  const coords0 = assignCoordinates(ordered, graphWithDummies, {
+  const coordinates = assignCoordinates(ordered, graphWithDummies, {
     layerGap: opts?.layerGap,
     nodeGap: opts?.nodeGap,
     direction: opts?.direction,
   });
-  const coordinates = mergeDummies(coords0, graphWithDummies, g);
 
   return {
     acyclic: gAcyclic,
