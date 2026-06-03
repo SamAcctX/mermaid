@@ -58,6 +58,7 @@ interface NodeWithVertex {
 
 interface ElkSubgraphConfig {
   mergeEdges?: boolean;
+  nodePlacementAlignment?: string;
   nodePlacementStrategy?: string;
 }
 
@@ -105,6 +106,7 @@ const ARROW_MAP: Record<string, [string, string]> = {
   arrow_circle: ['arrow_open', 'arrow_circle'],
   double_arrow_circle: ['arrow_circle', 'arrow_circle'],
 };
+const DEFAULT_NODE_PLACEMENT_ALIGNMENT = 'RIGHTDOWN';
 
 export function dir2ElkDirection(dir: unknown): 'RIGHT' | 'LEFT' | 'DOWN' | 'UP' {
   switch (dir) {
@@ -132,7 +134,8 @@ export function buildSubgraphLayoutOptions(
     'nodeLabels.placement': '[H_CENTER V_TOP, INSIDE]',
     'elk.layered.mergeEdges': elkConfig?.mergeEdges,
     'nodePlacement.strategy': elkConfig?.nodePlacementStrategy,
-    'elk.layered.nodePlacement.bk.fixedAlignment': 'RIGHTDOWN',
+    'elk.layered.nodePlacement.bk.fixedAlignment':
+      elkConfig?.nodePlacementAlignment ?? DEFAULT_NODE_PLACEMENT_ALIGNMENT,
   };
   if (node.dir) {
     layoutOptions['elk.algorithm'] = algorithm;
@@ -224,7 +227,8 @@ function createRootElkGraph(data4Layout: LayoutData, algorithm: string | undefin
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
       'elk.algorithm': algorithm,
       'nodePlacement.strategy': data4Layout.config.elk?.nodePlacementStrategy,
-      'elk.layered.nodePlacement.bk.fixedAlignment': 'RIGHTDOWN',
+      'elk.layered.nodePlacement.bk.fixedAlignment':
+        data4Layout.config.elk?.nodePlacementAlignment ?? DEFAULT_NODE_PLACEMENT_ALIGNMENT,
       'elk.layered.mergeEdges': data4Layout.config.elk?.mergeEdges,
       'elk.direction': 'DOWN',
       'spacing.baseValue': 40,

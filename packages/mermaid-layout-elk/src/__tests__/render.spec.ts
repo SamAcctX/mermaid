@@ -37,10 +37,21 @@ describe('buildSubgraphLayoutOptions', () => {
     expect(opts['nodePlacement.strategy']).toBe('BRANDES_KOEPF');
   });
 
+  it('defaults nodePlacementAlignment to RIGHTDOWN', () => {
+    const opts = buildSubgraphLayoutOptions({}, { mergeEdges: true }, 'layered');
+    expect(opts['elk.layered.nodePlacement.bk.fixedAlignment']).toBe('RIGHTDOWN');
+  });
+
+  it('passes through nodePlacementAlignment from config', () => {
+    const opts = buildSubgraphLayoutOptions({}, { nodePlacementAlignment: 'NONE' }, 'layered');
+    expect(opts['elk.layered.nodePlacement.bk.fixedAlignment']).toBe('NONE');
+  });
+
   it('handles undefined elkConfig gracefully', () => {
     const opts = buildSubgraphLayoutOptions({}, undefined, 'layered');
     expect(opts['elk.layered.mergeEdges']).toBeUndefined();
     expect(opts['nodePlacement.strategy']).toBeUndefined();
+    expect(opts['elk.layered.nodePlacement.bk.fixedAlignment']).toBe('RIGHTDOWN');
   });
 });
 
@@ -56,6 +67,13 @@ describe('dir2ElkDirection', () => {
 });
 
 describe('buildElkGraphFromLayoutData', () => {
+  const log = {
+    debug: () => undefined,
+    error: () => undefined,
+    info: () => undefined,
+    warn: () => undefined,
+  };
+
   it('builds an ELK graph from measured layout data without DOM handles', () => {
     const data = {
       direction: 'LR',
@@ -84,13 +102,6 @@ describe('buildElkGraphFromLayoutData', () => {
       ],
     } as any;
 
-    const log = {
-      debug: () => undefined,
-      error: () => undefined,
-      info: () => undefined,
-      warn: () => undefined,
-    };
-
     const state = buildElkGraphFromLayoutData(data, {
       algorithm: 'layered',
       common: { lineBreakRegex: /<br\s*\/?>/gi },
@@ -100,6 +111,9 @@ describe('buildElkGraphFromLayoutData', () => {
     } as any);
 
     expect(state.elkGraph.layoutOptions['elk.direction']).toBe('RIGHT');
+    expect(state.elkGraph.layoutOptions['elk.layered.nodePlacement.bk.fixedAlignment']).toBe(
+      'RIGHTDOWN'
+    );
     expect(state.elkGraph.children).toHaveLength(2);
 
     const group = state.nodeDb.group;
@@ -110,6 +124,28 @@ describe('buildElkGraphFromLayoutData', () => {
     const edge = state.elkGraph.edges[0];
     expect(edge.labels[0]).toMatchObject({ width: 22, height: 10, text: 'go' });
     expect(edge.labelEl).toBeUndefined();
+  });
+
+  it('passes through nodePlacementAlignment to the root graph', () => {
+    const state = buildElkGraphFromLayoutData(
+      {
+        direction: 'TB',
+        config: { elk: { nodePlacementAlignment: 'BALANCED' } },
+        nodes: [],
+        edges: [],
+      } as any,
+      {
+        algorithm: 'layered',
+        common: { lineBreakRegex: /<br\s*\/?>/gi },
+        getConfig: () => ({ flowchart: { wrappingWidth: 100 } }),
+        interpolateToCurve: (curve: unknown) => curve,
+        log,
+      } as any
+    );
+
+    expect(state.elkGraph.layoutOptions['elk.layered.nodePlacement.bk.fixedAlignment']).toBe(
+      'BALANCED'
+    );
   });
 });
 
