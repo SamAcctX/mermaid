@@ -1,7 +1,13 @@
 import { JSDOM } from 'jsdom';
 import { describe, it, expect, beforeAll } from 'vitest';
+import { select } from 'd3';
 import { Graph } from 'dagre-d3-es/src/graphlib/index.js';
-import { getEdgesToRender } from './index.js';
+import {
+  getEdgesToRender,
+  measureDagreLayout,
+  prepareLayoutForDagre,
+  runDagreLayoutCore,
+} from './index.js';
 import mermaid from '../../../mermaid.js';
 import { mermaidAPI } from '../../../mermaidAPI.js';
 
@@ -227,6 +233,82 @@ describe('getEdgesToRender', () => {
       { edge: segmentMid, start: 'A---A---1', end: 'A---A---2' },
       { edge: segment2, start: 'A---A---2', end: 'A' },
     ]);
+  });
+
+  it('measures DAGRE DOM separately from running the layout core', async () => {
+    const restoreDom = setupDom();
+
+    try {
+      const data4Layout = {
+        type: 'flowchart',
+        diagramId: 'dagre-phase-test',
+        direction: 'TB',
+        config: {
+          flowchart: {
+            htmlLabels: false,
+            nodeSpacing: 50,
+            rankSpacing: 50,
+          },
+        },
+        nodes: [
+          {
+            id: 'A',
+            domId: 'dagre-phase-test-A',
+            label: 'A',
+            shape: 'rect',
+            isGroup: false,
+            padding: 0,
+          },
+          {
+            id: 'B',
+            domId: 'dagre-phase-test-B',
+            label: 'B',
+            shape: 'rect',
+            isGroup: false,
+            padding: 0,
+          },
+        ],
+        edges: [
+          {
+            id: 'A-B',
+            start: 'A',
+            end: 'B',
+            label: '',
+            arrowTypeStart: 'none',
+            arrowTypeEnd: 'arrow_point',
+          },
+        ],
+      };
+      const preparedLayout = prepareLayoutForDagre(data4Layout);
+      const element = select(document.querySelector('#container')).append('svg').append('g');
+
+      const measuredLayout = await measureDagreLayout(data4Layout, { element, preparedLayout });
+
+      expect(measuredLayout.graph.node('A').width).toBeGreaterThan(0);
+      expect(measuredLayout.graph.node('A').x).toBeUndefined();
+
+      runDagreLayoutCore(data4Layout, { element, preparedLayout });
+
+      expect(measuredLayout.graph.node('A').x).toEqual(expect.any(Number));
+      expect(measuredLayout.graph.node('B').y).toEqual(expect.any(Number));
+    } finally {
+      restoreDom();
+    }
+  });
+
+  it('requires DAGRE measurement before running the layout core', () => {
+    const data4Layout = {
+      type: 'flowchart',
+      diagramId: 'dagre-phase-contract-test',
+      direction: 'TB',
+      config: {},
+      nodes: [],
+      edges: [],
+    };
+
+    expect(() => runDagreLayoutCore(data4Layout, {})).toThrow(
+      'runDagreLayoutCore requires measureDagreLayout to run first'
+    );
   });
 
   it('renders a flowchart self-loop as one SVG path', async () => {

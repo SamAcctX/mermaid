@@ -236,14 +236,14 @@ export const getEdgesToRender = (graph, yOffset = 0, { mergeSelfLoops = true } =
   return edgesToRender;
 };
 
-const measureAndRunDagreLayoutCore = async (
-  _elem,
+const measureDagreGraph = async ({
+  element: _elem,
   graph,
   diagramType,
   id,
   parentCluster,
-  siteConfig
-) => {
+  siteConfig,
+}) => {
   log.warn('Graph in recursive render:XAX', graphlibJson.write(graph), parentCluster);
   const dir = graph.graph().rankdir;
   log.trace('Dir in recursive render - dir:', dir);
@@ -300,14 +300,14 @@ const measureAndRunDagreLayoutCore = async (
         });
 
         // "o" will contain the full cluster not just the children
-        const o = await recursiveRender(
-          nodes,
-          node.graph,
+        const o = await renderDagreSubgraph({
+          element: nodes,
+          graph: node.graph,
           diagramType,
           id,
-          graph.node(v),
-          siteConfig
-        );
+          parentCluster: graph.node(v),
+          siteConfig,
+        });
         const newEl = o.elem;
         updateNodeBounds(node, newEl);
         // node.height = o.diff;
@@ -384,16 +384,6 @@ const measureAndRunDagreLayoutCore = async (
 
   await processEdges();
 
-  log.info('Graph before layout:', JSON.stringify(graphlibJson.write(graph)));
-
-  log.info('############################################# XXX');
-  log.info('###                Layout                 ### XXX');
-  log.info('############################################# XXX');
-
-  dagreLayout(graph);
-
-  log.info('Graph after layout:', JSON.stringify(graphlibJson.write(graph)));
-
   const { subGraphTitleTotalMargin } = getSubGraphTitleMargins(siteConfig);
   return {
     elem,
@@ -404,6 +394,18 @@ const measureAndRunDagreLayoutCore = async (
     mergeSelfLoops,
     subGraphTitleTotalMargin,
   };
+};
+
+const runDagreGraphLayout = (graph) => {
+  log.info('Graph before layout:', JSON.stringify(graphlibJson.write(graph)));
+
+  log.info('############################################# XXX');
+  log.info('###                Layout                 ### XXX');
+  log.info('############################################# XXX');
+
+  dagreLayout(graph);
+
+  log.info('Graph after layout:', JSON.stringify(graphlibJson.write(graph)));
 };
 
 const paintDagreLayoutCore = async ({
@@ -519,8 +521,11 @@ const paintDagreLayoutCore = async ({
   return { elem, diff };
 };
 
-const recursiveRender = async (...args) =>
-  await paintDagreLayoutCore(await measureAndRunDagreLayoutCore(...args));
+const renderDagreSubgraph = async (options) => {
+  const measuredLayout = await measureDagreGraph(options);
+  runDagreGraphLayout(measuredLayout.graph);
+  return await paintDagreLayoutCore(measuredLayout);
+};
 
 export const prepareLayoutForDagre = (data4Layout) => {
   const graph = new graphlib.Graph({
@@ -637,24 +642,35 @@ export const prepareLayoutForDagre = (data4Layout) => {
   return { graph };
 };
 
-export const runDagreLayoutCore = async (data4Layout, { element, preparedLayout }) => {
-  const { graph } = preparedLayout ?? prepareLayoutForDagre(data4Layout);
+export const measureDagreLayout = async (data4Layout, { element, preparedLayout }) => {
+  const prepared = preparedLayout ?? prepareLayoutForDagre(data4Layout);
   const siteConfig = getConfig();
-  return await measureAndRunDagreLayoutCore(
+  const measuredLayout = await measureDagreGraph({
     element,
-    graph,
-    data4Layout.type,
-    data4Layout.diagramId,
-    undefined,
-    siteConfig
-  );
+    graph: prepared.graph,
+    diagramType: data4Layout.type,
+    id: data4Layout.diagramId,
+    parentCluster: undefined,
+    siteConfig,
+  });
+  prepared.measuredLayout = measuredLayout;
+  return measuredLayout;
 };
 
-export const paintDagreLayout = async (_data4Layout, _context, coreResult) => {
-  await paintDagreLayoutCore(coreResult);
+export const runDagreLayoutCore = (_data4Layout, context) => {
+  const measuredLayout = context.preparedLayout?.measuredLayout;
+
+  if (!measuredLayout) {
+    throw new Error('runDagreLayoutCore requires measureDagreLayout to run first');
+  }
+
+  runDagreGraphLayout(measuredLayout.graph);
+  return measuredLayout;
 };
 
-const measureDagreLayout = () => Promise.resolve(undefined);
+export const paintDagreLayout = async (_data4Layout, { measure }, coreResult) => {
+  await paintDagreLayoutCore(coreResult ?? measure);
+};
 
 export const render = createCommonLayoutRenderer({
   prepareLayout: prepareLayoutForDagre,
