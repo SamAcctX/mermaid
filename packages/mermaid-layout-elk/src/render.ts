@@ -488,7 +488,6 @@ function configureSubgraphNodes(
         height: node?.labelData?.height ?? 50,
       },
     ];
-    node.width = (node.width ?? 0) + 2 * (node.padding ?? 0);
     elkContext.log.debug('UIO node label', node?.labelData?.width, node.padding);
     node.layoutOptions = buildSubgraphLayoutOptions(
       node,
