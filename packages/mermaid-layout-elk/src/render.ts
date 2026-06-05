@@ -193,6 +193,7 @@ export function buildElkGraphFromLayoutData(
 }
 
 export const render = createCommonLayoutRenderer<ElkLayoutResult, ElkPreparedLayout>({
+  // Note that defaultMeasureLayout and createGraphWithElements is called by the factory function
   prepareLayout: prepareLayoutForElk,
   runLayoutCore: runElkLayoutCore,
   paintOptions: {
