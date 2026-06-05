@@ -53,8 +53,14 @@ export const draw = async function (
 
   // Establish svg dimensions and get width and height
   // Why, oh why ????
-  if (bounds) {
-    const bounds2 = bounds;
+  const renderedBounds = nodes.node()?.getBBox();
+  const bounds2 =
+    renderedBounds &&
+    Number.isFinite(renderedBounds.width) &&
+    Number.isFinite(renderedBounds.height)
+      ? renderedBounds
+      : bounds;
+  if (bounds2) {
     const magicFactor = Math.max(1, Math.round(0.125 * (bounds2.width / bounds2.height)));
     const height = bounds2.height + magicFactor + 10;
     const width = bounds2.width + 10;

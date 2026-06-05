@@ -19,6 +19,9 @@ function getNodeFromBlock(block: Block, db: BlockDB, positioned = false) {
     classStr = (vertex?.classes ?? []).join(' ');
   }
   classStr = classStr + ' flowchart-label';
+  const cssCompiledStyles = (vertex?.classes ?? []).flatMap(
+    (className) => db.getClasses().get(className)?.styles ?? []
+  );
 
   // We create a SVG label, either by delegating to addHtmlLabel or manually
   let radius = 0;
@@ -107,13 +110,16 @@ function getNodeFromBlock(block: Block, db: BlockDB, positioned = false) {
     rx: radius,
     ry: radius,
     class: classStr,
+    cssClasses: classStr,
+    cssStyles: vertex?.styles ?? [],
+    cssCompiledStyles,
     style: styles.style,
     id: vertex.id,
     domId: dbDiagramId ? `${dbDiagramId}-${vertex.id}` : vertex.id,
     isGroup: false as const,
     directions: vertex.directions,
-    width: bounds.width,
-    height: bounds.height,
+    width: bounds.width || undefined,
+    height: bounds.height || undefined,
     x: bounds.x,
     y: bounds.y,
     positioned,
