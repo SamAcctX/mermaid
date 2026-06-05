@@ -93,16 +93,22 @@ export function postProcessSwimlaneLayout(layout: LayoutData, direction?: string
   // safety checks preserve obstacle clearance and the newly split lanes.
   collapseRedundantRectangularDoglegs(edges, nodeByIdMap);
 
+  const finalizeRenderedEdges = (): void => {
+    resolveRenderedOrthogonalCrossings(edges, nodeByIdMap);
+    anchorLabelsToPolyline(edges, nodeByIdMap);
+    prepareEdgeEndpointsForRenderer(edges, nodeByIdMap);
+  };
+
   // Wybrow-style crossing cleanup for the materialized render geometry. This
   // pass only activates when strict H/V crossings remain after the lower-level
   // nudging passes. It tries bounded port-pair and outer-channel candidates,
   // preserving obstacle clearance and accepting only candidates that reduce the
-  // rendered crossing count.
-  resolveRenderedOrthogonalCrossings(edges, nodeByIdMap);
+  // rendered crossing count or shorten an equally crossing route.
+  finalizeRenderedEdges();
 
-  // Re-anchor labels: the passes above reshaped several polylines after the
-  // initial anchoring, so labels must be snapped to the final geometry.
-  anchorLabelsToPolyline(edges, nodeByIdMap);
-
-  prepareEdgeEndpointsForRenderer(edges, nodeByIdMap);
+  // Endpoint preparation materializes the renderer-facing terminal stubs. In
+  // long return-edge cases those stubs can reveal a crossing that was not
+  // present in the pre-materialized route, so run the bounded track-swap
+  // cleanup once more and then re-prepare the endpoints it reshaped.
+  finalizeRenderedEdges();
 }
