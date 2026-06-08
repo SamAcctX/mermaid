@@ -10,6 +10,7 @@ import { portSwapToLShape } from './direction/portSwap.js';
 import { collapseShortTerminalStub } from './direction/terminalStub.js';
 import {
   collapseRedundantRectangularDoglegs,
+  liftObstacleHuggingSameSideRails,
   resolveRenderedOrthogonalCrossings,
   separateSharedRenderedTerminalLanes,
   swapDestinationTerminalTailsToReduceCrossings,
@@ -93,6 +94,10 @@ export function postProcessSwimlaneLayout(layout: LayoutData, direction?: string
   // become unnecessary. Remove only provably redundant rectangular doglegs;
   // safety checks preserve obstacle clearance and the newly split lanes.
   collapseRedundantRectangularDoglegs(edges, nodeByIdMap);
+
+  // Same-side rails can be routed just inside a taller intervening node's
+  // border. Lift those rails outside the blocker before crossing cleanup.
+  liftObstacleHuggingSameSideRails(edges, nodeByIdMap);
 
   // Some shared-destination crossings only improve when two terminal ports
   // exchange places together. Try that bounded transaction before falling back

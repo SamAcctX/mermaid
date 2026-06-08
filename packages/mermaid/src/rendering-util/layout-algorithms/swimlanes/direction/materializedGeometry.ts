@@ -11,6 +11,7 @@ import {
   sameY,
   buildOrthogonalPortPath,
   buildSameSideTrackPath,
+  overlapLength,
   orthogonalSegmentsForPoints,
   orthogonalSegmentsStrictlyCross,
   portForRectSide,
@@ -461,6 +462,204 @@ export function collapseRedundantRectangularDoglegs(
         break;
       }
     }
+    if (!fixed) {
+      return;
+    }
+  }
+}
+
+export function liftObstacleHuggingSameSideRails(
+  edges: any[],
+  nodeByIdMap: Map<string, any>
+): void {
+  const BUFFER = 2;
+  const CLEARANCE = 20;
+  const MAX_ITERATIONS = 8;
+
+  const { realNodeRects, labelNodeRects: labelRects } = collectNodeRectEntries(
+    nodeByIdMap.values()
+  );
+  const visibleEdges = edges.filter((edge) => !(edge as { isLayoutOnly?: boolean }).isLayoutOnly);
+
+  const pointsFor = (edge: any, replacementEdge?: any, replacement?: PointLite[]): PointLite[] =>
+    dedupeConsecutivePoints(
+      edge === replacementEdge
+        ? (replacement ?? [])
+        : ((edge as { points?: PointLite[] }).points ?? [])
+    );
+
+  const strictCrossingCount = (replacementEdge?: any, replacement?: PointLite[]): number => {
+    let count = 0;
+    for (let i = 0; i < visibleEdges.length; i++) {
+      const firstSegments = segmentsFor(pointsFor(visibleEdges[i], replacementEdge, replacement));
+      for (let j = i + 1; j < visibleEdges.length; j++) {
+        const secondSegments = segmentsFor(
+          pointsFor(visibleEdges[j], replacementEdge, replacement)
+        );
+        for (const firstSegment of firstSegments) {
+          for (const secondSegment of secondSegments) {
+            if (
+              orthogonalSegmentsStrictlyCross(
+                firstSegment.a,
+                firstSegment.b,
+                secondSegment.a,
+                secondSegment.b,
+                EPS_LOCAL
+              )
+            ) {
+              count++;
+            }
+          }
+        }
+      }
+    }
+    return count;
+  };
+
+  const middleRail = (
+    points: PointLite[]
+  ):
+    | { index: number; horizontal: boolean; vertical: boolean; segment: SegmentLite }
+    | undefined => {
+    const segments = segmentsFor(points);
+    if (segments.length !== 3) {
+      return undefined;
+    }
+    const middle = segments[1];
+    if (
+      segments[0].horizontal === middle.horizontal ||
+      segments[2].horizontal === middle.horizontal
+    ) {
+      return undefined;
+    }
+    return {
+      index: middle.index,
+      horizontal: middle.horizontal,
+      vertical: middle.vertical,
+      segment: middle,
+    };
+  };
+
+  const blockingRectsFor = (edge: any, rail: SegmentLite) => {
+    const endpointIds = [(edge as { start?: string }).start, (edge as { end?: string }).end].filter(
+      (id): id is string => Boolean(id)
+    );
+    return realNodeRects.filter((entry) => {
+      if (endpointIds.includes(entry.id)) {
+        return false;
+      }
+      const rect = entry.rect;
+      if (rail.horizontal) {
+        const xOverlap = overlapLength(rail.a.x, rail.b.x, rect.left, rect.right);
+        return (
+          xOverlap >= MIN_SHARED &&
+          rail.a.y >= rect.top - BUFFER &&
+          rail.a.y <= rect.bottom + BUFFER
+        );
+      }
+      const yOverlap = overlapLength(rail.a.y, rail.b.y, rect.top, rect.bottom);
+      return (
+        yOverlap >= MIN_SHARED && rail.a.x >= rect.left - BUFFER && rail.a.x <= rect.right + BUFFER
+      );
+    });
+  };
+
+  const candidateByMovingRail = (
+    points: PointLite[],
+    rail: SegmentLite,
+    coord: number
+  ): PointLite[] | undefined => {
+    const candidate = points.map((point) => ({ ...point }));
+    if (rail.horizontal) {
+      candidate[rail.index].y = coord;
+      candidate[rail.index + 1].y = coord;
+    } else if (rail.vertical) {
+      candidate[rail.index].x = coord;
+      candidate[rail.index + 1].x = coord;
+    } else {
+      return undefined;
+    }
+    const simplified = simplifyPolyline(dedupeConsecutivePoints(candidate));
+    return segmentsFor(simplified).length === simplified.length - 1 ? simplified : undefined;
+  };
+
+  const candidateIsSafe = (
+    edge: any,
+    candidate: PointLite[],
+    currentCrossings: number
+  ): boolean => {
+    const endpointIds = [(edge as { start?: string }).start, (edge as { end?: string }).end].filter(
+      (id): id is string => Boolean(id)
+    );
+    const candidateSegments = segmentsFor(candidate);
+    if (candidateSegments.length !== candidate.length - 1) {
+      return false;
+    }
+
+    for (const segment of candidateSegments) {
+      if (segmentHitsAnyRect(segment.a, segment.b, realNodeRects, endpointIds, -BUFFER)) {
+        return false;
+      }
+      if (segmentHitsAnyRect(segment.a, segment.b, labelRects, [], -BUFFER)) {
+        return false;
+      }
+    }
+
+    for (const other of visibleEdges) {
+      if (other === edge) {
+        continue;
+      }
+      for (const candidateSegment of candidateSegments) {
+        for (const otherSegment of segmentsFor(pointsFor(other))) {
+          if (sameAxisSegmentOverlapLength(candidateSegment, otherSegment, 0.5) >= MIN_SHARED) {
+            return false;
+          }
+        }
+      }
+    }
+
+    return strictCrossingCount(edge, candidate) <= currentCrossings;
+  };
+
+  for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    const currentCrossings = strictCrossingCount();
+    let fixed = false;
+
+    for (const edge of visibleEdges) {
+      const points = pointsFor(edge);
+      const rail = middleRail(points);
+      if (!rail) {
+        continue;
+      }
+      const blockers = blockingRectsFor(edge, rail.segment);
+      if (blockers.length === 0) {
+        continue;
+      }
+
+      const coords = rail.horizontal
+        ? [
+            Math.min(...blockers.map((entry) => entry.rect.top)) - CLEARANCE,
+            Math.max(...blockers.map((entry) => entry.rect.bottom)) + CLEARANCE,
+          ]
+        : [
+            Math.min(...blockers.map((entry) => entry.rect.left)) - CLEARANCE,
+            Math.max(...blockers.map((entry) => entry.rect.right)) + CLEARANCE,
+          ];
+
+      for (const coord of coords) {
+        const candidate = candidateByMovingRail(points, rail.segment, coord);
+        if (!candidate || !candidateIsSafe(edge, candidate, currentCrossings)) {
+          continue;
+        }
+        (edge as { points: PointLite[] }).points = candidate;
+        fixed = true;
+        break;
+      }
+      if (fixed) {
+        break;
+      }
+    }
+
     if (!fixed) {
       return;
     }

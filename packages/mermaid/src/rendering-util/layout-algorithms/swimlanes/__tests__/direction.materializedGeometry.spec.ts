@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   collapseRedundantRectangularDoglegs,
+  liftObstacleHuggingSameSideRails,
   separateSharedRenderedTerminalLanes,
   swapDestinationTerminalTailsToReduceCrossings,
 } from '../direction/materializedGeometry.js';
@@ -122,6 +123,36 @@ describe('materialized render geometry cleanup', () => {
     expect(edges[0].points).toEqual([
       { x: 0, y: 0 },
       { x: 0, y: 20 },
+    ]);
+  });
+
+  it('lifts a same-side rail away from an intervening node border', () => {
+    const nodeById = new Map<string, any>([
+      ['26', { id: '26', x: -166, y: 54, width: 232, height: 66 }],
+      ['27', { id: '27', x: 830, y: 54, width: 232, height: 66 }],
+      ['28', { id: '28', x: 166, y: 54, width: 232, height: 108 }],
+    ]);
+    const edges: any[] = [
+      {
+        id: 'L_26_27_0',
+        start: '26',
+        end: '27',
+        points: [
+          { x: -166, y: 21 },
+          { x: -166, y: 1 },
+          { x: 830, y: 1 },
+          { x: 830, y: 21 },
+        ],
+      },
+    ];
+
+    liftObstacleHuggingSameSideRails(edges, nodeById);
+
+    expect(edges[0].points).toEqual([
+      { x: -166, y: 21 },
+      { x: -166, y: -20 },
+      { x: 830, y: -20 },
+      { x: 830, y: 21 },
     ]);
   });
 
