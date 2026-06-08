@@ -12,6 +12,7 @@ import {
   collapseRedundantRectangularDoglegs,
   resolveRenderedOrthogonalCrossings,
   separateSharedRenderedTerminalLanes,
+  swapDestinationTerminalTailsToReduceCrossings,
 } from './direction/materializedGeometry.js';
 import { simplifyDetouredEdges } from './direction/detourSimplification.js';
 import { anchorLabelsToPolyline } from './direction/labelAnchoring.js';
@@ -92,6 +93,11 @@ export function postProcessSwimlaneLayout(layout: LayoutData, direction?: string
   // become unnecessary. Remove only provably redundant rectangular doglegs;
   // safety checks preserve obstacle clearance and the newly split lanes.
   collapseRedundantRectangularDoglegs(edges, nodeByIdMap);
+
+  // Some shared-destination crossings only improve when two terminal ports
+  // exchange places together. Try that bounded transaction before falling back
+  // to whole-edge reroutes.
+  swapDestinationTerminalTailsToReduceCrossings(edges, nodeByIdMap);
 
   // Wybrow-style crossing cleanup for the materialized render geometry. This
   // pass only activates when strict H/V crossings remain after the lower-level

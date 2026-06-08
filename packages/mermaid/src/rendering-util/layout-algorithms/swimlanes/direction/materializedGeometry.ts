@@ -17,6 +17,7 @@ import {
   rectOfNodeBounds,
   sameAxisSegmentOverlapLength,
   segmentHitsAnyRect,
+  simplifyPolyline,
 } from './geometry.js';
 import type { OrthogonalSegment, Point, RectBounds, RectSide } from './geometry.js';
 
@@ -462,6 +463,223 @@ export function collapseRedundantRectangularDoglegs(
     }
     if (!fixed) {
       return;
+    }
+  }
+}
+
+export function swapDestinationTerminalTailsToReduceCrossings(
+  edges: any[],
+  nodeByIdMap: Map<string, any>
+): void {
+  const BUFFER = 2;
+  const MAX_ITERATIONS = 4;
+
+  interface TerminalTail {
+    tailStart: PointLite;
+    terminal: PointLite;
+  }
+
+  const { realNodeRects } = collectNodeRectEntries(nodeByIdMap.values());
+  const visibleEdges = edges.filter((edge) => !(edge as { isLayoutOnly?: boolean }).isLayoutOnly);
+
+  const replacementPointsFor = (
+    edge: any,
+    replacements: Map<any, PointLite[]> = new Map()
+  ): PointLite[] =>
+    dedupeConsecutivePoints(
+      replacements.get(edge) ?? (edge as { points?: PointLite[] }).points ?? []
+    );
+
+  const crossingCount = (replacements: Map<any, PointLite[]> = new Map()): number => {
+    let count = 0;
+    for (let i = 0; i < visibleEdges.length; i++) {
+      const firstSegments = segmentsFor(replacementPointsFor(visibleEdges[i], replacements));
+      for (let j = i + 1; j < visibleEdges.length; j++) {
+        const secondSegments = segmentsFor(replacementPointsFor(visibleEdges[j], replacements));
+        for (const firstSegment of firstSegments) {
+          for (const secondSegment of secondSegments) {
+            if (
+              orthogonalSegmentsStrictlyCross(
+                firstSegment.a,
+                firstSegment.b,
+                secondSegment.a,
+                secondSegment.b,
+                EPS_LOCAL
+              )
+            ) {
+              count++;
+            }
+          }
+        }
+      }
+    }
+    return count;
+  };
+
+  const totalBends = (replacements: Map<any, PointLite[]> = new Map()): number =>
+    visibleEdges.reduce(
+      (sum, edge) => sum + countOrthogonalBends(replacementPointsFor(edge, replacements)),
+      0
+    );
+
+  const terminalTailFor = (edge: any): TerminalTail | undefined => {
+    const points = replacementPointsFor(edge);
+    if (points.length < 4) {
+      return undefined;
+    }
+    const tailStart = points[points.length - 2];
+    const terminal = points[points.length - 1];
+    if (
+      !isHorizontalSegment(tailStart, terminal, EPS_LOCAL) &&
+      !isVerticalSegment(tailStart, terminal, EPS_LOCAL)
+    ) {
+      return undefined;
+    }
+    return { tailStart, terminal };
+  };
+
+  const candidateWithDestinationTail = (edge: any, tail: TerminalTail): PointLite[] | undefined => {
+    const points = replacementPointsFor(edge);
+    if (points.length < 3) {
+      return undefined;
+    }
+    const start = points[0];
+    const firstTurn = points[1];
+
+    let connector: PointLite;
+    if (isHorizontalSegment(start, firstTurn, EPS_LOCAL)) {
+      connector = { x: firstTurn.x, y: tail.tailStart.y };
+    } else if (isVerticalSegment(start, firstTurn, EPS_LOCAL)) {
+      connector = { x: tail.tailStart.x, y: firstTurn.y };
+    } else {
+      return undefined;
+    }
+
+    const candidate = simplifyPolyline(
+      dedupeConsecutivePoints([start, firstTurn, connector, tail.tailStart, tail.terminal])
+    );
+    return segmentsFor(candidate).length === candidate.length - 1 ? candidate : undefined;
+  };
+
+  const pathHasNodeHit = (edge: any, path: PointLite[]): boolean => {
+    const endpointIds = [(edge as { start?: string }).start, (edge as { end?: string }).end].filter(
+      (id): id is string => Boolean(id)
+    );
+    for (const segment of segmentsFor(path)) {
+      if (segmentHitsAnyRect(segment.a, segment.b, realNodeRects, endpointIds, -BUFFER)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const pathHasSharedTrack = (
+    edge: any,
+    path: PointLite[],
+    replacements: Map<any, PointLite[]>
+  ): boolean => {
+    for (const other of visibleEdges) {
+      if (other === edge) {
+        continue;
+      }
+      for (const candidateSegment of segmentsFor(path)) {
+        for (const otherSegment of segmentsFor(replacementPointsFor(other, replacements))) {
+          if (sameAxisSegmentOverlapLength(candidateSegment, otherSegment, 0.5) >= MIN_SHARED) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+
+  const candidateIsSafe = (
+    edge: any,
+    path: PointLite[],
+    replacements: Map<any, PointLite[]>
+  ): boolean => !pathHasNodeHit(edge, path) && !pathHasSharedTrack(edge, path, replacements);
+
+  const edgesByDestination = (): Map<string, any[]> => {
+    const result = new Map<string, any[]>();
+    for (const edge of visibleEdges) {
+      const dstId = (edge as { end?: string }).end;
+      if (!dstId || !nodeByIdMap.has(dstId)) {
+        continue;
+      }
+      const points = replacementPointsFor(edge);
+      if (points.length < 4) {
+        continue;
+      }
+      const bucket = result.get(dstId) ?? [];
+      bucket.push(edge);
+      result.set(dstId, bucket);
+    }
+    return result;
+  };
+
+  for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    const currentCrossings = crossingCount();
+    if (currentCrossings === 0) {
+      return;
+    }
+    const currentBends = totalBends();
+
+    let bestReplacements: Map<any, PointLite[]> | undefined;
+    let bestCrossings = currentCrossings;
+    let bestBends = currentBends;
+
+    for (const destinationEdges of edgesByDestination().values()) {
+      for (let i = 0; i < destinationEdges.length; i++) {
+        for (let j = i + 1; j < destinationEdges.length; j++) {
+          const first = destinationEdges[i];
+          const second = destinationEdges[j];
+          const firstTail = terminalTailFor(first);
+          const secondTail = terminalTailFor(second);
+          if (!firstTail || !secondTail) {
+            continue;
+          }
+
+          const firstCandidate = candidateWithDestinationTail(first, secondTail);
+          const secondCandidate = candidateWithDestinationTail(second, firstTail);
+          if (!firstCandidate || !secondCandidate) {
+            continue;
+          }
+
+          const replacements = new Map<any, PointLite[]>([
+            [first, firstCandidate],
+            [second, secondCandidate],
+          ]);
+          if (
+            !candidateIsSafe(first, firstCandidate, replacements) ||
+            !candidateIsSafe(second, secondCandidate, replacements)
+          ) {
+            continue;
+          }
+
+          const candidateCrossings = crossingCount(replacements);
+          const candidateBends = totalBends(replacements);
+          if (candidateCrossings >= currentCrossings) {
+            continue;
+          }
+          if (
+            candidateCrossings > bestCrossings ||
+            (candidateCrossings === bestCrossings && candidateBends >= bestBends)
+          ) {
+            continue;
+          }
+          bestReplacements = replacements;
+          bestCrossings = candidateCrossings;
+          bestBends = candidateBends;
+        }
+      }
+    }
+
+    if (!bestReplacements) {
+      return;
+    }
+
+    for (const [edge, points] of bestReplacements) {
+      (edge as { points: PointLite[] }).points = points;
     }
   }
 }

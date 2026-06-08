@@ -1,6 +1,7 @@
 // cspell:ignore Helmers Wybrow
 import type { Edge, Node } from '../../../types.js';
 import {
+  dedupeConsecutivePoints,
   inflateRect,
   rectContainsRect,
   rectFromCenterSize,
@@ -71,8 +72,9 @@ function normalizeRect(rect: RectBounds): RectBounds {
 }
 
 function labelOverlapsOwnMarker(rect: RectBounds, pts: { x: number; y: number }[]): boolean {
-  const startMarker = markerClearanceRectFor(pts, true);
-  const endMarker = markerClearanceRectFor(pts, false);
+  const visiblePts = dedupeConsecutivePoints(pts);
+  const startMarker = markerClearanceRectFor(visiblePts, true);
+  const endMarker = markerClearanceRectFor(visiblePts, false);
   return [startMarker, endMarker].some(
     (marker) => marker && rectsOverlap(rect, normalizeRect(marker))
   );
