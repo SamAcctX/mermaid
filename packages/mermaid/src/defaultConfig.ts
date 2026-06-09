@@ -57,7 +57,7 @@ const config: RequiredDeep<MermaidConfig> = {
     },
   },
   class: {
-    defaultRenderer: defaultConfigJson.class.defaultRenderer,
+    defaultRenderer: 'dagre-wrapper',
     hideEmptyMembersBox: false,
     hierarchicalNamespaces: true,
   },
