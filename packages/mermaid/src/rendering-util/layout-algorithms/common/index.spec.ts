@@ -351,7 +351,7 @@ describe('paintLayoutData', () => {
 
   it('lets layout algorithms decide which group nodes are clusters', async () => {
     const { paintLayoutData } = await import('./index.js');
-    const leafGroup = node('G', { isGroup: true, shape: 'rectWithTitle' });
+    const leafGroup = node('G', { isGroup: true, shape: 'roundedWithTitle' });
     const data = layout({
       nodes: [leafGroup],
       edges: [],

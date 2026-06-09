@@ -17,7 +17,7 @@ import {
 } from '../../rendering-elements/edges.js';
 import insertMarkers from '../../rendering-elements/markers.js';
 import { clear as clearNodes, positionNode } from '../../rendering-elements/nodes.js';
-import type { LayoutData, Edge } from '../../types.js';
+import type { LayoutData, Edge, ClusterNode } from '../../types.js';
 import type { RenderOptions } from '../../render.js';
 import { clear as clearGraphlib } from '../dagre/mermaid-graphlib.js';
 
@@ -214,8 +214,8 @@ function shouldPaintAsCluster(
   node: LayoutData['nodes'][number],
   context: CommonLayoutPaintContext<unknown, CommonLayoutMeasure>,
   options: CommonLayoutPaintOptions
-): boolean {
-  return options.isCluster?.(node, context) ?? Boolean(node.isGroup);
+): node is ClusterNode {
+  return node.isGroup === true && (options.isCluster?.(node, context) ?? true);
 }
 
 function buildNodeLookup(nodes: LayoutData['nodes']): Map<string, LayoutData['nodes'][number]> {
