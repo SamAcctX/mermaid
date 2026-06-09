@@ -622,6 +622,38 @@ C --> C`
     expect(edgesToRender[0].edge.originalEdge).toBeUndefined();
   });
 
+  it('renders a recursive class relationship as one path with multiplicity labels', async () => {
+    const restoreDom = setupDom();
+
+    try {
+      const { svg } = await mermaidAPI.render(
+        'class-self-loop-shared-paint-test',
+        `classDiagram
+class SelfReferential{
+  +int id
+  +int self_referential_id
+  +SelfReferential referenced
+}
+SelfReferential "1" --> "0..1" SelfReferential : referenced`
+      );
+      const dom = new JSDOM(svg);
+      const document = dom.window.document;
+      const cyclicPaths = getCyclicPaths(document);
+      const edgePaths = document.querySelectorAll('.edgePaths path[data-edge="true"]');
+      const terminalLabels = [...document.querySelectorAll('.edgeTerminals')].map((label) =>
+        label.textContent?.trim()
+      );
+
+      expect(cyclicPaths).toHaveLength(0);
+      expect(edgePaths).toHaveLength(1);
+      expect(terminalLabels).toContain('1');
+      expect(terminalLabels).toContain('0..1');
+      expectFinitePaths(edgePaths);
+    } finally {
+      restoreDom();
+    }
+  });
+
   it('renders a flowchart subgraph through the shared paint path', async () => {
     const restoreDom = setupDom();
 

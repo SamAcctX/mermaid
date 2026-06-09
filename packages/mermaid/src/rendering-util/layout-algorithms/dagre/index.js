@@ -384,10 +384,19 @@ const measureDagreGraph = async ({
         if (edge.selfLoop.order !== 1) {
           return;
         }
-        const segmentId = edge.id;
-        edge.id = edge.selfLoop.id;
-        await insertEdgeLabel(edgeLabels, edge);
-        edge.id = segmentId;
+        const labelEdge = {
+          ...edge.originalEdge,
+          ...edge,
+          id: edge.selfLoop.id,
+          startLabelLeft: edge.originalEdge?.startLabelLeft ?? edge.startLabelLeft,
+          startLabelRight: edge.originalEdge?.startLabelRight ?? edge.startLabelRight,
+          endLabelLeft: edge.originalEdge?.endLabelLeft ?? edge.endLabelLeft,
+          endLabelRight: edge.originalEdge?.endLabelRight ?? edge.endLabelRight,
+        };
+        await insertEdgeLabel(edgeLabels, labelEdge);
+        edge.width = labelEdge.width;
+        edge.height = labelEdge.height;
+        edge.labelStyle = labelEdge.labelStyle;
         return;
       }
       await insertEdgeLabel(edgeLabels, edge);
