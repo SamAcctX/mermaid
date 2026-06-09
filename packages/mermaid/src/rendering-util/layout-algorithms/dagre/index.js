@@ -33,10 +33,12 @@ const getDefaultSelfLoopSide = (rankdir = 'TB') => {
   }
 };
 
-// Class diagrams also use dagre, but self-referential multiplicity labels rely on
-// the existing segmented self-loop rendering path for terminal label placement.
 const shouldMergeSelfLoopSegments = (diagramType) =>
-  diagramType === 'flowchart' || diagramType === 'flowchart-v2' || diagramType === 'stateDiagram';
+  diagramType === 'flowchart' ||
+  diagramType === 'flowchart-v2' ||
+  diagramType === 'stateDiagram' ||
+  diagramType === 'er' ||
+  diagramType === 'classDiagram';
 
 const DAGRE_NODE_LAYOUT_PROPERTIES = [
   'x',
@@ -387,10 +389,19 @@ const measureDagreGraph = async ({
         if (edge.selfLoop.order !== 1) {
           return;
         }
-        const segmentId = edge.id;
-        edge.id = edge.selfLoop.id;
-        await insertEdgeLabel(edgeLabels, edge);
-        edge.id = segmentId;
+        const labelEdge = {
+          ...edge.originalEdge,
+          ...edge,
+          id: edge.selfLoop.id,
+          startLabelLeft: edge.originalEdge?.startLabelLeft ?? edge.startLabelLeft,
+          startLabelRight: edge.originalEdge?.startLabelRight ?? edge.startLabelRight,
+          endLabelLeft: edge.originalEdge?.endLabelLeft ?? edge.endLabelLeft,
+          endLabelRight: edge.originalEdge?.endLabelRight ?? edge.endLabelRight,
+        };
+        await insertEdgeLabel(edgeLabels, labelEdge);
+        edge.width = labelEdge.width;
+        edge.height = labelEdge.height;
+        edge.labelStyle = labelEdge.labelStyle;
         return;
       }
       await insertEdgeLabel(edgeLabels, edge);
@@ -465,13 +476,15 @@ export const applyDagreLayoutResult = (data4Layout, measuredLayout) => {
   const nodeById = new Map(data4Layout.nodes.map((node) => [node.id, node]));
 
   sortNodesByHierarchy(graph).forEach((nodeId) => {
-    const targetNode = nodeById.get(nodeId);
-    if (!targetNode) {
+    const dagreNode = normalizeDagreNode(graph, nodeId, subGraphTitleTotalMargin);
+    if (!dagreNode) {
       return;
     }
 
-    const dagreNode = normalizeDagreNode(graph, nodeId, subGraphTitleTotalMargin);
-    if (dagreNode) {
+    applyDagreNodeLayout(graph.node(nodeId), dagreNode);
+
+    const targetNode = nodeById.get(nodeId);
+    if (targetNode) {
       applyDagreNodeLayout(targetNode, dagreNode);
     }
   });
@@ -745,12 +758,22 @@ export const runDagreLayoutCore = (_data4Layout, context) => {
   return measuredLayout;
 };
 
+const getDagrePaintNodes = (_data4Layout, { measure }) =>
+  sortNodesByHierarchy(measure.graph)
+    .map((nodeId) => measure.graph.node(nodeId))
+    .filter(Boolean);
+
+const getDagreEdgeNode = (nodeId, _edge, { measure }) =>
+  nodeId ? measure.graph.node(nodeId) : undefined;
+
 export const render = createCommonLayoutRenderer({
   prepareLayout: prepareLayoutForDagre,
   measureLayout: measureDagreLayout,
   runLayoutCore: runDagreLayoutCore,
   paintOptions: {
     clusterDb,
+    getNodes: getDagrePaintNodes,
+    getEdgeNode: getDagreEdgeNode,
     skipNode: (node, { measure }) => !measure.graph.hasNode(node.id),
     isCluster: (node, { measure }) =>
       measure.graph.hasNode(node.id) && (measure.graph.children(node.id) ?? []).length > 0,

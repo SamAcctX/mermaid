@@ -55,6 +55,15 @@ export interface CommonLayoutPaintContext<
 
 export interface CommonLayoutPaintOptions {
   clusterDb?: ClusterDb;
+  getNodes?: (
+    data4Layout: LayoutData,
+    context: CommonLayoutPaintContext<unknown, CommonLayoutMeasure>
+  ) => Iterable<LayoutData['nodes'][number]>;
+  getEdgeNode?: (
+    id: string | undefined,
+    edge: Edge,
+    context: CommonLayoutPaintContext<unknown, CommonLayoutMeasure>
+  ) => LayoutData['nodes'][number] | object | undefined;
   skipNode?: (
     node: LayoutData['nodes'][number],
     context: CommonLayoutPaintContext<unknown, CommonLayoutMeasure>
@@ -177,7 +186,7 @@ export async function paintLayoutData(
   const { groups } = measure;
 
   // Render clusters and position nodes; this also populates node.intersect on shapes.
-  for (const node of data4Layout.nodes) {
+  for (const node of options.getNodes?.(data4Layout, context) ?? data4Layout.nodes) {
     if (options.skipNode?.(node, context)) {
       continue;
     }
@@ -191,7 +200,7 @@ export async function paintLayoutData(
       continue;
     }
 
-    await paintLayoutEdge(groups, edge, nodeById, data4Layout, options);
+    await paintLayoutEdge(groups, edge, nodeById, data4Layout, options, context);
   }
 }
 
@@ -237,15 +246,16 @@ async function paintLayoutEdge(
   edge: Edge,
   nodeById: Map<string, LayoutData['nodes'][number]>,
   data4Layout: LayoutData,
-  options: CommonLayoutPaintOptions
+  options: CommonLayoutPaintOptions,
+  context: CommonLayoutPaintContext<unknown, CommonLayoutMeasure>
 ): Promise<void> {
   const paths = insertEdge(
     groups.edgePaths,
     { ...edge },
     options.clusterDb ?? EMPTY_CLUSTER_DB,
     data4Layout.type,
-    getRenderedNode(edge.start, nodeById),
-    getRenderedNode(edge.end, nodeById),
+    getRenderedNode(edge.start, edge, nodeById, context, options),
+    getRenderedNode(edge.end, edge, nodeById, context, options),
     data4Layout.diagramId,
     shouldSkipIntersect(edge, options)
   ) as EdgeRenderPaths | undefined;
@@ -260,9 +270,12 @@ async function paintLayoutEdge(
 
 function getRenderedNode(
   id: string | undefined,
-  nodeById: Map<string, LayoutData['nodes'][number]>
+  edge: Edge,
+  nodeById: Map<string, LayoutData['nodes'][number]>,
+  context: CommonLayoutPaintContext<unknown, CommonLayoutMeasure>,
+  options: CommonLayoutPaintOptions
 ): LayoutData['nodes'][number] | object {
-  return id ? (nodeById.get(id) ?? {}) : {};
+  return options.getEdgeNode?.(id, edge, context) ?? (id ? (nodeById.get(id) ?? {}) : {});
 }
 
 function shouldSkipIntersect(edge: Edge, options: CommonLayoutPaintOptions): boolean {

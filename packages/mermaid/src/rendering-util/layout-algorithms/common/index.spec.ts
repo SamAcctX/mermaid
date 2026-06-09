@@ -385,6 +385,36 @@ describe('paintLayoutData', () => {
     expect(mocks.positionNode).not.toHaveBeenCalledWith(extractedNode);
   });
 
+  it('lets layout algorithms provide graph-backed paint nodes and edge endpoints', async () => {
+    const { paintLayoutData } = await import('./index.js');
+    const nodeB = node('B');
+    const graphOnlyNode = node('dummy');
+    const renderEdge = edge('render', { start: graphOnlyNode.id, end: nodeB.id });
+    const data = layout({
+      nodes: [nodeB],
+      edges: [renderEdge],
+    });
+    const measured = measure();
+
+    await paintLayoutData(data, { measure: measured } as never, {
+      getNodes: () => [graphOnlyNode, nodeB],
+      getEdgeNode: (id) => (id === graphOnlyNode.id ? graphOnlyNode : undefined),
+    });
+
+    expect(mocks.positionNode).toHaveBeenNthCalledWith(1, graphOnlyNode);
+    expect(mocks.positionNode).toHaveBeenNthCalledWith(2, nodeB);
+    expect(mocks.insertEdge).toHaveBeenCalledWith(
+      measured.groups.edgePaths,
+      { ...renderEdge },
+      expect.any(Map),
+      data.type,
+      graphOnlyNode,
+      nodeB,
+      data.diagramId,
+      false
+    );
+  });
+
   it('inserts and positions edge labels after drawing labelled edges', async () => {
     const { paintLayoutData } = await import('./index.js');
     const labelledEdge = edge('labelled', { label: 'Yes', x: 0, y: 0 } as Partial<Edge>);
