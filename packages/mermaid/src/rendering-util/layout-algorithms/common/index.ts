@@ -36,8 +36,6 @@ interface EdgeRenderPaths {
   updatedPath?: EdgeRenderPath;
 }
 
-const EMPTY_CLUSTER_DB: ClusterDb = new Map();
-
 export interface CommonLayoutRenderContext<PreparedLayout = unknown> {
   element: D3Selection<SVGElement>;
   helpers?: InternalHelpers;
@@ -252,7 +250,7 @@ async function paintLayoutEdge(
   const paths = insertEdge(
     groups.edgePaths,
     { ...edge },
-    options.clusterDb ?? EMPTY_CLUSTER_DB,
+    options.clusterDb ?? new Map(),
     data4Layout.type,
     getRenderedNode(edge.start, edge, nodeById, context, options),
     getRenderedNode(edge.end, edge, nodeById, context, options),
