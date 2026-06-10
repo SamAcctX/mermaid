@@ -16,7 +16,7 @@ const textDimensionCalculator: TextDimensionCalculator = {
 };
 
 const chartConfig = {
-  ...(defaultConfig.xyChart as XYChartConfig),
+  ...defaultConfig.xyChart,
   showLegend: true,
 } satisfies XYChartConfig;
 
