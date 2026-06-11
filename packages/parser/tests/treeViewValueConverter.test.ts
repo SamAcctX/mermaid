@@ -64,7 +64,11 @@ describe('TreeViewValueConverter', () => {
 
   describe('ICON_ANNOTATION', () => {
     it('should extract icon name', () => {
-      expect(convert(converter, 'ICON_ANNOTATION', ' icon(database)')).toBe('database');
+      expect(convert(converter, 'ICON_ANNOTATION', ' icon(folder)')).toBe('folder');
+    });
+
+    it('should extract prefixed iconify name', () => {
+      expect(convert(converter, 'ICON_ANNOTATION', ' icon(logos:react)')).toBe('logos:react');
     });
 
     it('should return empty string for icon()', () => {

@@ -77,3 +77,4 @@ mermaid-parser.tar.gz
 .ralph/
 .tmp
 .fallow/
+.playwright-mcp/

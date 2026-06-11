@@ -38,7 +38,7 @@ const styles: DiagramStylesProvider = ({
         stroke: ${lineColor};
     }
     .treeView-node-icon {
-        fill: ${iconColor};
+        color: ${iconColor};
     }
     .treeView-node-description {
         font-size: ${labelFontSize};

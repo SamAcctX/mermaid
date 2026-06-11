@@ -38,11 +38,11 @@ export default {
       isDefault: false,
       code: `treeView-beta
             src/
-                App.tsx :::highlight icon(react) ## main component
+                App.tsx :::highlight icon(logos:react) ## main component
                 index.js ## entry point
-                styles.css
+                styles.css icon(none)
             data/
-                model.bin icon(database)
+                model.bin icon(logos:mysql)
             .env ## environment variables
             Dockerfile
             package.json`,

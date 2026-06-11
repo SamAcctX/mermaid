@@ -6,7 +6,7 @@ import { sanitizeText } from '../common/common.js';
 import { populateCommonDb } from '../common/populateCommonDb.js';
 import { preprocessBoxDrawing, remapErrorLines } from './boxDrawingPreprocessor.js';
 import db from './db.js';
-import { resolveIcon } from './icons.js';
+import { getDefaultIcon } from './icons.js';
 import type { NodeType } from './types.js';
 
 const populate = (ast: TreeView) => {
@@ -27,21 +27,21 @@ const populate = (ast: TreeView) => {
     // Read annotations directly from AST fields (cleaned by value converter)
     const cssClass = (node.classAnnotation as unknown as string) || undefined;
 
-    // Icon: value converter extracts the name from icon(name)
+    // Icon: value converter extracts the iconify name from icon(name)
     // Empty string from icon() means suppress icon
     const rawIcon = node.iconAnnotation as unknown as string | undefined;
-    let iconId: string | undefined;
+    let icon: string | undefined;
     if (rawIcon !== undefined) {
-      iconId = rawIcon || 'none'; // empty string → 'none' (suppress)
+      icon = rawIcon || 'none'; // empty string → 'none' (suppress)
     } else {
-      iconId = resolveIcon(isDirectory ? name + '/' : name, nodeType);
+      icon = getDefaultIcon(nodeType);
     }
 
     // Description comes pre-trimmed from value converter; sanitize for defense in depth
     const rawDesc = (node.descAnnotation as unknown as string) || undefined;
     const description = rawDesc ? sanitizeText(rawDesc, getConfig()) : undefined;
 
-    db.addNode(level, name, nodeType, cssClass, iconId, description);
+    db.addNode(level, name, nodeType, cssClass, icon, description);
   }
 };
 

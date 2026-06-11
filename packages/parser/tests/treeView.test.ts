@@ -131,9 +131,15 @@ describe('TreeView Parser', () => {
     });
 
     it('should extract icon name from ICON_ANNOTATION', () => {
-      const result = parse('treeView-beta\ndata.bin icon(database)');
+      const result = parse('treeView-beta\ndata.bin icon(folder)');
       expectNoErrorsOrAlternatives(result);
-      expect(result.value.nodes[0].iconAnnotation).toBe('database');
+      expect(result.value.nodes[0].iconAnnotation).toBe('folder');
+    });
+
+    it('should extract prefixed iconify name from ICON_ANNOTATION', () => {
+      const result = parse('treeView-beta\nApp.tsx icon(logos:react)');
+      expectNoErrorsOrAlternatives(result);
+      expect(result.value.nodes[0].iconAnnotation).toBe('logos:react');
     });
 
     it('should handle empty icon()', () => {

@@ -66,6 +66,11 @@
       <pre class="source"></pre>
       <div class="rendered">
         <pre class="mermaid">
+---
+config:
+  treeView:
+    showIcons: false
+---
 treeView-beta
 "docs"
     "build"
@@ -90,7 +95,7 @@ treeView-beta
 my-project/
     src/
         components/
-            Button.tsx
+            But  _  _ton💓.tsx
             Header.tsx
         App.tsx
         index.js
@@ -109,15 +114,16 @@ my-project/
 treeView-beta
 my-project/
     src/
-        App.tsx :::highlight icon(react) ## main component
+        App.tsx :::highlight icon(logos:react) ## main component
         index.js ## entry point
-        styles.css
+        styles.css icon(none)
     data/
-        model.bin icon(database)
+        model.bin icon(logos:mysql)
     .env ## environment variables
-    Dockerfile
+    Dockerfile icon(logos:docker-icon)
     package.json
-        </pre>
+</pre
+        >
       </div>
     </div>
 
@@ -223,6 +229,13 @@ treeView-beta
       }
 
       import mermaid from './mermaid.esm.mjs';
+      mermaid.registerIconPacks([
+        {
+          name: 'logos',
+          loader: () =>
+            fetch('https://unpkg.com/@iconify-json/logos/icons.json').then((res) => res.json()),
+        },
+      ]);
       mermaid.initialize({
         logLevel: 1,
         securityLevel: 'loose',

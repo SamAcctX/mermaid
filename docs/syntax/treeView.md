@@ -8,14 +8,14 @@
 
 ## Introduction
 
-A TreeView diagram is used to represent hierarchical data in the form of a directory-like structure, with file-type icons, connector lines, and optional annotations.
+A TreeView diagram is used to represent hierarchical data in the form of a directory-like structure, with file/folder icons, connector lines, and optional annotations.
 
 ## Syntax
 
 The structure of the tree depends only on indentation. Labels can be **bare** (unquoted) or **quoted** (for names containing spaces).
 
 - Directories are indicated by a trailing `/` on the label — they get a folder icon and bold text.
-- Files are auto-detected by extension and assigned a matching icon.
+- Files get a file icon — override it per node with `icon()`.
 - Quoted labels (`"my file"`) support spaces in names.
 
 ```
@@ -65,7 +65,7 @@ All annotations work the same way — just append them after the label:
 ```mermaid-example
 treeView-beta
 ├── src/
-│   ├── App.tsx :::highlight icon(react) ## main component
+│   ├── App.tsx :::highlight icon(logos:react) ## main component
 │   └── index.ts ## entry point
 ├── .env ## environment variables
 ├── Dockerfile
@@ -75,7 +75,7 @@ treeView-beta
 ```mermaid
 treeView-beta
 ├── src/
-│   ├── App.tsx :::highlight icon(react) ## main component
+│   ├── App.tsx :::highlight icon(logos:react) ## main component
 │   └── index.ts ## entry point
 ├── .env ## environment variables
 ├── Dockerfile
@@ -156,24 +156,45 @@ treeView-beta
 
 ### Icon overrides with icon()
 
-Override the auto-detected icon with `icon(name)`:
+Every node gets one of the two built-in icons by default — `file` for files and `folder` for directories. Override the default with `icon(name)`, where `name` is any icon from a registered [icon pack](../config/icons.md), referenced as `pack:name`:
 
 ```mermaid-example
 treeView-beta
-    data/
-        model.bin icon(database)
-        weights.h5 icon(database)
     src/
+        App.tsx icon(logos:react)
         index.js
+    package.json
 ```
 
 ```mermaid
 treeView-beta
-    data/
-        model.bin icon(database)
-        weights.h5 icon(database)
     src/
+        App.tsx icon(logos:react)
         index.js
+    package.json
+```
+
+The built-in `file` and `folder` icons can be referenced without a prefix, e.g. `icon(folder)`.
+
+> **Note**
+> Icon packs are not bundled with Mermaid — they must be registered with `registerIconPacks` by the site embedding the diagram. See [registering icon packs](../config/icons.md). An unregistered icon renders as a question mark.
+
+### Hiding icons
+
+Use `icon()` or `icon(none)` to hide the icon of a single node. Set the `showIcons` config option to `false` to hide all icons.
+
+```mermaid-example
+treeView-beta
+    src/
+        index.js icon(none)
+    package.json
+```
+
+```mermaid
+treeView-beta
+    src/
+        index.js icon(none)
+    package.json
 ```
 
 ### Combined annotations
@@ -184,7 +205,7 @@ Annotations can be combined in any order:
 treeView-beta
     my-project/
         src/
-            App.tsx :::highlight icon(react) ## main component
+            App.tsx :::highlight icon(logos:react) ## main component
             index.js ## entry point
         .env ## environment variables
         Dockerfile
@@ -195,7 +216,7 @@ treeView-beta
 treeView-beta
     my-project/
         src/
-            App.tsx :::highlight icon(react) ## main component
+            App.tsx :::highlight icon(logos:react) ## main component
             index.js ## entry point
         .env ## environment variables
         Dockerfile
@@ -286,36 +307,12 @@ treeView-beta
 
 ### Theme Variables
 
-| Property         | Description                    | Default Value        |
-| ---------------- | ------------------------------ | -------------------- |
-| labelFontSize    | Font size of the label         | '16px'               |
-| labelColor       | Color of the label             | 'black'              |
-| lineColor        | Color of the line              | 'black'              |
-| iconColor        | Color of file-type icons       | '#546e7a'            |
-| descriptionColor | Color of `##` description text | '#6a9955'            |
-| highlightBg      | Highlight background fill      | rgba(255,193,7,0.15) |
-| highlightStroke  | Highlight border stroke        | #ffc107              |
-
-## Supported Icons
-
-Icons are auto-detected from file extensions and known filenames:
-
-| Extension / Filename  | Icon       |
-| --------------------- | ---------- |
-| `.js`, `.mjs`, `.cjs` | javascript |
-| `.ts`                 | typescript |
-| `.jsx`, `.tsx`        | react      |
-| `.py`                 | python     |
-| `.json`               | json       |
-| `.md`, `.mdx`         | markdown   |
-| `.html`, `.htm`       | html       |
-| `.css`, `.scss`       | css        |
-| `.yaml`, `.yml`       | yaml       |
-| `.sh`, `.bash`        | terminal   |
-| `.sql`, `.db`         | database   |
-| `.lock`               | lock       |
-| `.gitignore`          | git        |
-| `Dockerfile`          | docker     |
-| `Makefile`            | terminal   |
-| Directories (`/`)     | folder     |
-| Unknown extension     | file       |
+| Property         | Description                                               | Default Value        |
+| ---------------- | --------------------------------------------------------- | -------------------- |
+| labelFontSize    | Font size of the label                                    | '16px'               |
+| labelColor       | Color of the label                                        | 'black'              |
+| lineColor        | Color of the line                                         | 'black'              |
+| iconColor        | Color of icons (applies to icons that use `currentColor`) | '#546e7a'            |
+| descriptionColor | Color of `##` description text                            | '#6a9955'            |
+| highlightBg      | Highlight background fill                                 | rgba(255,193,7,0.15) |
+| highlightStroke  | Highlight border stroke                                   | #ffc107              |

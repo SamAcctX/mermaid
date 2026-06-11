@@ -114,14 +114,32 @@ treeView-beta
     );
   });
 
-  it('should render icon() overrides', () => {
+  it('should render icon() overrides from registered iconify packs', () => {
     imgSnapshotTest(
       `treeView-beta
             data/
-                model.bin icon(database)
-                weights.h5 icon(database)
+                model.bin icon(fa:bell)
+                weights.h5 icon(folder)
             src/
                 index.js`
+    );
+  });
+
+  it('should render the unknown-icon fallback for unregistered icons', () => {
+    imgSnapshotTest(
+      `treeView-beta
+            src/
+                index.js icon(unregistered:icon)`
+    );
+  });
+
+  it('should hide icons with icon(none) and icon()', () => {
+    imgSnapshotTest(
+      `treeView-beta
+            src/
+                index.js icon(none)
+                App.tsx icon()
+            package.json`
     );
   });
 
@@ -130,7 +148,7 @@ treeView-beta
       `treeView-beta
             my-project/
                 src/
-                    App.tsx :::highlight icon(react) ## main component
+                    App.tsx :::highlight icon(fa:bell) ## main component
                     index.js ## entry point
                     styles.css
                 .env ## environment variables
