@@ -110,18 +110,29 @@ const EXTENSION_ICONS: Record<string, string> = {
   '.gql': 'graphql',
 };
 
+interface IconDetectionConfig {
+  /** Exact-filename → icon additions/overrides, merged over the built-in map */
+  filenameIcons?: Record<string, string>;
+  /** Extension → icon additions/overrides (keys with or without leading dot), merged over the built-in map */
+  extensionIcons?: Record<string, string>;
+}
+
 /**
  * Detect a file-type icon name from a filename.
- * Exact filename match wins over the (case-insensitive) extension match.
- * Returns `undefined` when nothing matches.
+ * Filename matches (user-configured, then built-in) win over extension
+ * matches (user-configured, then built-in); extensions match
+ * case-insensitively. Returns `undefined` when nothing matches.
  */
-export function detectIcon(name: string): string | undefined {
-  if (name in FILENAME_ICONS) {
-    return FILENAME_ICONS[name];
+export function detectIcon(name: string, config?: IconDetectionConfig): string | undefined {
+  const filenameIcon = config?.filenameIcons?.[name] ?? FILENAME_ICONS[name];
+  if (filenameIcon) {
+    return filenameIcon;
   }
   const dotIdx = name.lastIndexOf('.');
   if (dotIdx > 0) {
-    return EXTENSION_ICONS[name.substring(dotIdx).toLowerCase()];
+    const ext = name.substring(dotIdx).toLowerCase();
+    const extensionIcons = config?.extensionIcons;
+    return extensionIcons?.[ext] ?? extensionIcons?.[ext.slice(1)] ?? EXTENSION_ICONS[ext];
   }
   return undefined;
 }
@@ -142,12 +153,13 @@ function qualifyIcon(icon: string, defaultIconPack: string): string {
  *
  * An explicit `icon()` annotation always wins (with `none` hiding the icon);
  * otherwise, when `showIcons` is enabled, the icon is auto-detected from the
- * filename (requires `defaultIconPack`), falling back to the built-in
- * file/folder icon. Returns `undefined` when no icon should be rendered.
+ * filename (unprefixed detected names require `defaultIconPack`), falling
+ * back to the built-in file/folder icon. Returns `undefined` when no icon
+ * should be rendered.
  */
 export function getNodeIcon(
   node: { icon?: string; name: string; nodeType: NodeType },
-  config: { showIcons: boolean; defaultIconPack: string }
+  config: { showIcons: boolean; defaultIconPack: string } & IconDetectionConfig
 ): string | undefined {
   if (node.icon === 'none') {
     return undefined;
@@ -158,10 +170,23 @@ export function getNodeIcon(
   if (!config.showIcons) {
     return undefined;
   }
-  if (node.nodeType === 'file' && config.defaultIconPack) {
-    const detected = detectIcon(node.name);
+  if (node.nodeType === 'file') {
+    const detected = detectIcon(node.name, config);
+    if (detected === 'none') {
+      return undefined;
+    }
     if (detected) {
-      return `${config.defaultIconPack}:${detected}`;
+      if (detected.includes(':')) {
+        return detected;
+      }
+      if (detected in treeViewIcons.icons) {
+        return `${treeViewIcons.prefix}:${detected}`;
+      }
+      if (config.defaultIconPack) {
+        return `${config.defaultIconPack}:${detected}`;
+      }
+      // unprefixed detection result without a pack to resolve it in —
+      // fall through to the built-in default
     }
   }
   return `${treeViewIcons.prefix}:${node.nodeType === 'directory' ? 'folder' : 'file'}`;

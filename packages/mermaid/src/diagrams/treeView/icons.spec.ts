@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { detectIcon, getNodeIcon, treeViewIcons } from './icons.js';
 
-const config = (overrides: Partial<{ showIcons: boolean; defaultIconPack: string }> = {}) => ({
+const config = (
+  overrides: Partial<{
+    showIcons: boolean;
+    defaultIconPack: string;
+    filenameIcons: Record<string, string>;
+    extensionIcons: Record<string, string>;
+  }> = {}
+) => ({
   showIcons: false,
   defaultIconPack: '',
+  filenameIcons: {},
+  extensionIcons: {},
   ...overrides,
 });
 
@@ -61,6 +70,34 @@ describe('icons', () => {
       expect(detectIcon('data.xyz')).toBeUndefined();
       expect(detectIcon('noext')).toBeUndefined();
       expect(detectIcon('.bashrc')).toBeUndefined();
+    });
+
+    describe('config overrides', () => {
+      it('user extension entries beat the built-in extension mapping', () => {
+        expect(detectIcon('utils.ts', config({ extensionIcons: { '.ts': 'logos:deno' } }))).toBe(
+          'logos:deno'
+        );
+      });
+
+      it('extension keys work with or without the leading dot', () => {
+        expect(detectIcon('main.zig', config({ extensionIcons: { '.zig': 'zig' } }))).toBe('zig');
+        expect(detectIcon('main.zig', config({ extensionIcons: { zig: 'zig' } }))).toBe('zig');
+      });
+
+      it('user filename entries beat the built-in filename mapping', () => {
+        expect(
+          detectIcon('package.json', config({ filenameIcons: { 'package.json': 'nodejs' } }))
+        ).toBe('nodejs');
+        expect(detectIcon('Makefile', config({ filenameIcons: { Makefile: 'cmake' } }))).toBe(
+          'cmake'
+        );
+      });
+
+      it('built-in filename matches still beat user extension entries', () => {
+        expect(
+          detectIcon('tsconfig.json', config({ extensionIcons: { '.json': 'logos:json' } }))
+        ).toBe('typescript');
+      });
     });
   });
 
@@ -131,6 +168,58 @@ describe('icons', () => {
       expect(getNodeIcon(dir('src'), config({ showIcons: true, defaultIconPack: 'devicon' }))).toBe(
         'mermaid-treeview:folder'
       );
+    });
+
+    describe('detection map overrides', () => {
+      it('hides the icon for files mapped to none', () => {
+        expect(
+          getNodeIcon(
+            file('notes.txt'),
+            config({
+              showIcons: true,
+              defaultIconPack: 'devicon',
+              extensionIcons: { '.txt': 'none' },
+            })
+          )
+        ).toBeUndefined();
+      });
+
+      it('uses prefixed override values even without a defaultIconPack', () => {
+        expect(
+          getNodeIcon(
+            file('utils.ts'),
+            config({ showIcons: true, extensionIcons: { '.ts': 'logos:deno' } })
+          )
+        ).toBe('logos:deno');
+      });
+
+      it('qualifies unprefixed override values with the defaultIconPack', () => {
+        expect(
+          getNodeIcon(
+            file('main.zig'),
+            config({ showIcons: true, defaultIconPack: 'devicon', extensionIcons: { zig: 'zig' } })
+          )
+        ).toBe('devicon:zig');
+      });
+
+      it('falls back to the built-in file icon for unprefixed override values without a defaultIconPack', () => {
+        expect(
+          getNodeIcon(file('main.zig'), config({ showIcons: true, extensionIcons: { zig: 'zig' } }))
+        ).toBe('mermaid-treeview:file');
+      });
+
+      it('allows override values to reference the built-in icons', () => {
+        expect(
+          getNodeIcon(
+            file('notes.txt'),
+            config({
+              showIcons: true,
+              defaultIconPack: 'devicon',
+              filenameIcons: { 'notes.txt': 'folder' },
+            })
+          )
+        ).toBe('mermaid-treeview:folder');
+      });
     });
   });
 });

@@ -53,6 +53,46 @@ treeView-beta
             package.json`,
     },
     {
+      title: 'Automatic File-Type Icons',
+      isDefault: false,
+      code: `---
+config:
+  treeView:
+    showIcons: true
+    defaultIconPack: devicon
+---
+treeView-beta
+            my-project/
+                src/
+                    App.tsx
+                    main.py
+                    index.html
+                Dockerfile
+                package.json
+                README.md`,
+    },
+    {
+      title: 'Custom Icon Mappings',
+      isDefault: false,
+      code: `---
+config:
+  treeView:
+    showIcons: true
+    defaultIconPack: devicon
+    filenameIcons:
+      Makefile: cmake
+    extensionIcons:
+      .tf: terraform
+      .txt: none
+---
+treeView-beta
+            infra/
+                main.tf
+                Makefile
+            notes.txt
+            README.md`,
+    },
+    {
       title: 'Unicode Icons in Filenames',
       isDefault: false,
       code: `treeView-beta

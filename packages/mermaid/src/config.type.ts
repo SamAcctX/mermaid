@@ -1831,6 +1831,31 @@ export interface TreeViewDiagramConfig extends BaseDiagramConfig {
    *
    */
   defaultIconPack?: string;
+  /**
+   * Additions/overrides for the exact-filename → icon mapping used by
+   * automatic icon detection, e.g. `{ "Makefile": "cmake" }`.
+   * Values are resolved like `icon()` references: `pack:name` is used
+   * as-is, unprefixed names resolve via `defaultIconPack`, and `none`
+   * disables the icon for matching files.
+   * Entries take precedence over the built-in mapping.
+   *
+   */
+  filenameIcons?: {
+    [k: string]: string;
+  };
+  /**
+   * Additions/overrides for the file-extension → icon mapping used by
+   * automatic icon detection, e.g. `{ ".zig": "zig" }`. Keys are
+   * lowercase and may include or omit the leading dot.
+   * Values are resolved like `icon()` references: `pack:name` is used
+   * as-is, unprefixed names resolve via `defaultIconPack`, and `none`
+   * disables the icon for matching files.
+   * Entries take precedence over the built-in mapping.
+   *
+   */
+  extensionIcons?: {
+    [k: string]: string;
+  };
 }
 /**
  * The object containing configurations specific for radar diagrams.

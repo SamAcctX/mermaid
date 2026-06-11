@@ -148,6 +148,28 @@ treeView-beta
     );
   });
 
+  it('should apply filenameIcons and extensionIcons detection overrides', () => {
+    imgSnapshotTest(
+      `---
+config:
+  treeView:
+    showIcons: true
+    defaultIconPack: devicon
+    filenameIcons:
+      README.md: 'fa:bell'
+    extensionIcons:
+      .py: none
+      .xyz: javascript
+---
+treeView-beta
+            src/
+                main.py
+                data.xyz
+                index.ts
+            README.md`
+    );
+  });
+
   it('should resolve unprefixed icon() overrides via defaultIconPack', () => {
     imgSnapshotTest(
       `---

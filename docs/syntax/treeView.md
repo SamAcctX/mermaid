@@ -220,6 +220,48 @@ treeView-beta
     package.json
 ```
 
+The detection maps can be extended or overridden with the `filenameIcons` and `extensionIcons` config options. Values are resolved like `icon()` references — `pack:name` is used as-is, unprefixed names resolve via `defaultIconPack`, and `none` disables the icon for matching files:
+
+```mermaid-example
+---
+config:
+  treeView:
+    showIcons: true
+    defaultIconPack: devicon
+    filenameIcons:
+      Makefile: cmake
+    extensionIcons:
+      .tf: terraform
+      .txt: none
+---
+treeView-beta
+    infra/
+        main.tf
+        Makefile
+    notes.txt
+    README.md
+```
+
+```mermaid
+---
+config:
+  treeView:
+    showIcons: true
+    defaultIconPack: devicon
+    filenameIcons:
+      Makefile: cmake
+    extensionIcons:
+      .tf: terraform
+      .txt: none
+---
+treeView-beta
+    infra/
+        main.tf
+        Makefile
+    notes.txt
+    README.md
+```
+
 #### Icon overrides with icon()
 
 Set a node's icon explicitly with `icon(name)`, where `name` is any icon from a registered [icon pack](../config/icons.md), referenced as `pack:name`. Explicit icons always render, even when `showIcons` is off:
@@ -407,6 +449,8 @@ treeView-beta
 | lineThickness   | Thickness of the line                                                                   | 1             |
 | showIcons       | Whether to show the default file/folder icons (explicit `icon()` always renders)        | false         |
 | defaultIconPack | Registered iconify pack used for auto-detected icons and unprefixed `icon()` references | ''            |
+| filenameIcons   | Filename → icon additions/overrides for auto-detection                                  | {}            |
+| extensionIcons  | Extension → icon additions/overrides for auto-detection                                 | {}            |
 
 ### Theme Variables
 
