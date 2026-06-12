@@ -102,7 +102,7 @@ describe('diagram beta policy', () => {
       expect.fail(
         `New diagram type(s) must require \`-beta\` syntax: ${violations.join(', ')}.\n` +
           'Expected the detector to accept the `-beta` keyword and reject it without the suffix.\n' +
-          'Do not add to GRANDFATHERED_BETA — update the detector instead.'
+          'Do not add to NEVER_BETA_DIAGRAMS — update the detector instead.'
       );
     }
   });
