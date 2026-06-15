@@ -197,7 +197,6 @@ describe('createCommonLayoutRenderer', () => {
     const svg = { select: vi.fn().mockReturnValue(element) };
     const measured = measure();
     const options = { algorithm: 'elk.layered' };
-    const positions = { A: { x: 1, y: 2 } };
     const preparedLayout: PreparedLayout = { graph: 'prepared-layout' };
     const seenContexts: CommonLayoutRenderContext<PreparedLayout>[] = [];
 
@@ -234,7 +233,7 @@ describe('createCommonLayoutRenderer', () => {
       },
     });
 
-    await render(data, svg as never, undefined, options, positions as never);
+    await render(data, svg as never, undefined, options);
 
     expect(svg.select).toHaveBeenCalledWith('g');
     expect(mocks.insertMarkers).toHaveBeenCalledWith(
@@ -258,7 +257,6 @@ describe('createCommonLayoutRenderer', () => {
     for (const context of seenContexts) {
       expect(context.element).toBe(element);
       expect(context.options).toBe(options);
-      expect(context.positions).toBe(positions);
       expect(context.preparedLayout).toBe(preparedLayout);
     }
   });

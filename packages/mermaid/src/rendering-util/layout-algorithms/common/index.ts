@@ -1,4 +1,4 @@
-import type { Positions, SVG } from '../../../diagram-api/types.js';
+import type { SVG } from '../../../diagram-api/types.js';
 import type { InternalHelpers } from '../../../internals.js';
 import type { D3Selection } from '../../../types.js';
 import { log } from '../../../logger.js';
@@ -39,7 +39,6 @@ export interface CommonLayoutRenderContext<PreparedLayout = unknown> {
   element: D3Selection<SVGElement>;
   helpers?: InternalHelpers;
   options?: RenderOptions;
-  positions?: Positions;
   preparedLayout?: PreparedLayout;
 }
 
@@ -97,39 +96,57 @@ export function createCommonLayoutRenderer<
   afterPaint,
   paintOptions,
 }: CommonLayoutRendererDefinition<CoreResult, PreparedLayout, MeasureResult>) {
+  // Use the provided measureLayout or default to createGraphWithElements if not provided.
+  // This allows layout algorithms to skip the graph creation step if they don't need it,
+  // while still providing a default implementation for those that do.
   const measureLayoutFn =
     measureLayout ??
     (defaultMeasureLayout as unknown as NonNullable<
       CommonLayoutRendererDefinition<CoreResult, PreparedLayout, MeasureResult>['measureLayout']
     >);
 
+  // This is the actual factory step where the render function is created.
   return async function render(
     data4Layout: LayoutData,
     svg: SVG,
     helpers?: InternalHelpers,
-    options?: RenderOptions,
-    positions?: Positions
+    options?: RenderOptions
   ): Promise<void> {
     const element = svg.select('g') as unknown as D3Selection<SVGElement>;
     insertMarkers(element, data4Layout.markers, data4Layout.type, data4Layout.diagramId);
     clearLayoutRenderState();
 
+    // Convenience struct containing everything you need to render
+    // the root element and helper function from core mermaid
     const renderContext: CommonLayoutRenderContext<PreparedLayout> = {
-      element,
-      helpers,
-      options,
-      positions,
+      element, // root SVG <g>
+      helpers, // Mermaid helper functions
+      options, // { algorithm: "elk.layered" }
     };
+
+    // Algorithm-specific transformations onto the original parsed layout data so the algorithm-specific
+    // layout core has the inputs and setup it needs
     renderContext.preparedLayout = await prepareLayout?.(data4Layout, renderContext);
 
+    // Get the sizes of the labels and other elements by running the measureLayout function,
+    // which by default creates a graph with the elements and measures them.
+    // This is needed for layout algorithms that require size information to compute the layout.
     const measure = await measureLayoutFn(data4Layout, renderContext);
+
+    // Next, run the core layout algorithm to compute the positions of nodes and edges based on the algorithm,
+    // layoutData and the measurements. This is the core piece where functions are supposed to be different
+    // between different algorithms.
     const coreResult = await runLayoutCore(data4Layout, renderContext);
+
     const paintContext: CommonLayoutPaintContext<PreparedLayout, MeasureResult> = {
       ...renderContext,
       measure,
     };
 
     if (paintLayout) {
+      // Escape hatch: if a custom paintLayout is provided, we assume it handles everything including painting
+      // based on the layout data and measurements, so we just call it directly with the core result. Only to be used
+      // sparingly during transitions to the new system or for very custom layouts that don't fit the common pattern.
       await paintLayout(data4Layout, paintContext, coreResult);
     } else {
       await paintLayoutData(
@@ -138,6 +155,8 @@ export function createCommonLayoutRenderer<
         paintOptions
       );
     }
+    // Some algorithms may need to do some post-processing after the initial paint, for example to position edge
+    // labels after the edges have been rendered and their paths are known.
     await afterPaint?.(data4Layout, paintContext, coreResult);
   };
 }

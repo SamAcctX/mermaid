@@ -10,7 +10,7 @@
 
 # Interface: CommonLayoutPaintContext\<PreparedLayout, MeasureResult>
 
-Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:46](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L46)
+Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:45](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L45)
 
 ## Extends
 
@@ -492,7 +492,7 @@ The curve factory to use
 
 > **measure**: `MeasureResult`
 
-Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:50](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L50)
+Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:49](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L49)
 
 ---
 
@@ -508,23 +508,11 @@ Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.
 
 ---
 
-### positions?
-
-> `optional` **positions**: `Positions`
-
-Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:42](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L42)
-
-#### Inherited from
-
-[`CommonLayoutRenderContext`](CommonLayoutRenderContext.md).[`positions`](CommonLayoutRenderContext.md#positions)
-
----
-
 ### preparedLayout?
 
 > `optional` **preparedLayout**: `PreparedLayout`
 
-Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:43](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L43)
+Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:42](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L42)
 
 #### Inherited from
 

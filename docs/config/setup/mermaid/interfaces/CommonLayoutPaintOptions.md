@@ -10,7 +10,7 @@
 
 # Interface: CommonLayoutPaintOptions
 
-Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:53](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L53)
+Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:52](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L52)
 
 ## Properties
 
@@ -18,7 +18,7 @@ Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.
 
 > `optional` **skipEdge**: (`edge`) => `boolean`
 
-Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:54](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L54)
+Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:53](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L53)
 
 #### Parameters
 
@@ -36,4 +36,4 @@ Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.
 
 > `optional` **skipIntersect**: `boolean` | (`edge`) => `boolean`
 
-Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:55](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L55)
+Defined in: [packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts:54](https://github.com/mermaid-js/mermaid/blob/master/packages/mermaid/src/rendering-util/layout-algorithms/common/index.ts#L54)
