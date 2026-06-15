@@ -109,16 +109,31 @@ type ViewerTab = 'diagram' | 'code' | 'profile';
 
 const ALL_LAYOUTS: MermaidLayout[] = ['dagre', 'elk', 'domus', 'hola', 'swimlane'];
 
+// mermaid's `maxTextSize` (default 50_000) and `maxEdges` (default 500) are
+// *secure* config keys, so they can't be raised from a diagram's frontmatter/
+// directives — only via initialize(). The Dev Explorer is for testing large
+// diagrams, so we set generous limits here.
+const DEV_MAX_TEXT_SIZE = 50_000_000;
+const DEV_MAX_EDGES = 1_000_000;
+
 // Phases emitted by the profiler tree, in display order. "total" is taken from
 // the root `render` span. See packages/mermaid/src/profiler.ts.
 const PROFILE_PHASES = ['parse', 'prepare', 'measure', 'layout', 'paint', 'serialize'] as const;
 
-type PhaseStat = { median: number; min: number; samples: number };
-type LayoutProfile = {
+// One render's normalized per-phase durations + total.
+type RunSample = { total: number; phases: Record<string, number> };
+// Trimmed-mean aggregate for one (diagram, layout) series.
+type RunStats = { total: number; phases: Record<string, number>; samples: number };
+// One diagram's result within a layout.
+type DiagramResult = { diagram: string; stats: RunStats | null; failures: number };
+// Aggregate for one layout across the whole diagram set.
+type LayoutSetResult = {
   layout: string;
-  phases: Record<string, PhaseStat>;
-  total: PhaseStat;
-  /** Number of renders that failed for this layout (excluded from stats). */
+  perDiagram: DiagramResult[];
+  /** Sum of per-diagram total render times — the headline score (lower is better). */
+  score: number;
+  /** Sum of per-diagram values for each phase. */
+  phaseTotals: Record<string, number>;
   failures: number;
 };
 
@@ -131,42 +146,70 @@ function findSpan(tree: ProfileSpanLike, name: string): ProfileSpanLike | undefi
   return undefined;
 }
 
-function median(values: number[]): number {
-  if (values.length === 0) return NaN;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+// Resolve a phase's duration from a render tree, normalizing the measure/layout
+// split so the columns are comparable across layouts. elk measures DOM node
+// sizes in its measureLayout hook (the top-level "measure" span) and its layout
+// span is pure algorithm. dagre instead supplies a no-op measure hook and sizes
+// nodes inside its layout core, emitting a "measure" span nested in "layout". So:
+//   measure = the hook span + any measure span nested inside layout
+//   layout  = the layout span minus that nested measure (i.e. pure algorithm)
+// Other phases are read directly.
+function phaseDuration(tree: ProfileSpanLike, phase: string): number | undefined {
+  if (phase === 'measure') {
+    const hook = findSpan(tree, 'measure');
+    const layoutSpan = findSpan(tree, 'layout');
+    const inLayout = layoutSpan ? findSpan(layoutSpan, 'measure') : undefined;
+    if (!hook && !inLayout) return undefined;
+    return (hook?.duration ?? 0) + (inLayout && inLayout !== hook ? inLayout.duration : 0);
+  }
+  if (phase === 'layout') {
+    const layoutSpan = findSpan(tree, 'layout');
+    if (!layoutSpan) return undefined;
+    const inLayout = findSpan(layoutSpan, 'measure');
+    return layoutSpan.duration - (inLayout?.duration ?? 0);
+  }
+  return findSpan(tree, phase)?.duration;
 }
 
-function statFor(values: number[]): PhaseStat {
-  return {
-    median: median(values),
-    min: values.length ? Math.min(...values) : NaN,
-    samples: values.length,
-  };
+function mean(values: number[]): number {
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : NaN;
 }
 
-function aggregateProfile(
-  records: ProfileRecordLike[],
-  layouts: string[],
-  failures: Record<string, number>
-): LayoutProfile[] {
-  return layouts.map((layout) => {
-    const recs = records.filter((r) => r.label === layout);
-    const phases: Record<string, PhaseStat> = {};
-    for (const phase of PROFILE_PHASES) {
-      const values = recs
-        .map((r) => findSpan(r.tree, phase)?.duration)
-        .filter((v): v is number => typeof v === 'number');
-      phases[phase] = statFor(values);
+// Normalize one render tree to its per-phase durations + total.
+function sampleFromTree(tree: ProfileSpanLike): RunSample {
+  const phases: Record<string, number> = {};
+  for (const phase of PROFILE_PHASES) {
+    const d = phaseDuration(tree, phase);
+    if (typeof d === 'number') phases[phase] = d;
+  }
+  return { total: tree.duration, phases };
+}
+
+// Aggregate a (diagram, layout) series: drop the single fastest and slowest run
+// by total — discarding warmup/cold-start and any anomaly — then mean the rest.
+function trimmedStats(samples: RunSample[]): RunStats | null {
+  if (samples.length === 0) return null;
+  let kept = samples;
+  if (samples.length >= 3) {
+    kept = [...samples].sort((a, b) => a.total - b.total).slice(1, -1);
+  }
+  const phases: Record<string, number> = {};
+  for (const phase of PROFILE_PHASES) {
+    const vals = kept.map((k) => k.phases[phase]).filter((v): v is number => typeof v === 'number');
+    if (vals.length) {
+      phases[phase] = mean(vals);
     }
-    const totals = recs.map((r) => r.tree.duration).filter((v) => typeof v === 'number');
-    return { layout, phases, total: statFor(totals), failures: failures[layout] ?? 0 };
-  });
+  }
+  return { total: mean(kept.map((k) => k.total)), phases, samples: kept.length };
 }
 
 function fmtMs(n: number): string {
   return Number.isFinite(n) ? n.toFixed(1) : '–';
+}
+
+function baseName(path: string): string {
+  const i = path.lastIndexOf('/');
+  return i === -1 ? path : path.slice(i + 1);
 }
 
 const DEFAULT_THEME: MermaidTheme = 'default';
@@ -283,12 +326,14 @@ export class DevDiagramViewer extends LitElement {
     sizesSaving: { state: true },
     sizesMessage: { state: true },
     siblings: { state: true },
+    profileScope: { state: true },
     profileLayouts: { state: true },
     profileIterations: { state: true },
     profileRunning: { state: true },
     profileProgress: { state: true },
     profileError: { state: true },
     profileResults: { state: true },
+    profileCopyMsg: { state: true },
   };
 
   declare filePath: string;
@@ -314,14 +359,17 @@ export class DevDiagramViewer extends LitElement {
   declare sizesSaving: boolean;
   declare sizesMessage: string;
   declare siblings: string[];
+  declare profileScope: 'diagram' | 'folder';
   declare profileLayouts: MermaidLayout[];
   declare profileIterations: number;
   declare profileRunning: boolean;
   declare profileProgress: string;
   declare profileError: string;
-  declare profileResults: LayoutProfile[] | null;
+  declare profileResults: LayoutSetResult[] | null;
+  declare profileCopyMsg: string;
 
   #renderSeq = 0;
+  #profileCancel = false;
   #consolePatched = false;
   #originalConsole?: {
     log: typeof console.log;
@@ -408,6 +456,8 @@ export class DevDiagramViewer extends LitElement {
       (v): v is MermaidLayout => isLayout(v)
     );
     this.profileLayouts = parsedProfileLayouts.length ? parsedProfileLayouts : ['dagre', 'elk'];
+    this.profileScope =
+      readStorage('devExplorer.viewer.profileScope') === 'folder' ? 'folder' : 'diagram';
     const storedIterations = Number(readStorage('devExplorer.viewer.profileIterations'));
     this.profileIterations =
       Number.isFinite(storedIterations) && storedIterations >= 1 ? storedIterations : 5;
@@ -415,6 +465,7 @@ export class DevDiagramViewer extends LitElement {
     this.profileProgress = '';
     this.profileError = '';
     this.profileResults = null;
+    this.profileCopyMsg = '';
   }
 
   createRenderRoot() {
@@ -632,12 +683,16 @@ export class DevDiagramViewer extends LitElement {
     panel?.clear?.();
   }
 
-  async #fetchSource() {
+  async #fetchSourceFor(path: string) {
     const url = new URL('/dev/api/file', window.location.origin);
-    url.searchParams.set('path', this.filePath);
+    url.searchParams.set('path', path);
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.text();
+  }
+
+  async #fetchSource() {
+    return this.#fetchSourceFor(this.filePath);
   }
 
   async #saveSource() {
@@ -815,12 +870,107 @@ export class DevDiagramViewer extends LitElement {
     writeStorage('devExplorer.viewer.profileIterations', String(clamped));
   }
 
+  #setProfileScope(scope: string) {
+    const next = scope === 'folder' ? 'folder' : 'diagram';
+    this.profileScope = next;
+    writeStorage('devExplorer.viewer.profileScope', next);
+  }
+
+  #cancelProfile() {
+    this.#profileCancel = true;
+  }
+
+  // Serializable snapshot of the last run, for tracking improvements across runs.
+  #profileResultsJson() {
+    const round1 = (n: number) => (Number.isFinite(n) ? Math.round(n * 10) / 10 : null);
+    const roundMap = (m: Record<string, number>) =>
+      Object.fromEntries(Object.entries(m).map(([k, v]) => [k, round1(v)]));
+    return {
+      capturedAt: new Date().toISOString(),
+      scope: this.profileScope,
+      iterations: this.profileIterations,
+      aggregation: 'mean of runs after dropping the fastest and slowest; warmup discarded',
+      theme: this.theme,
+      look: this.look,
+      phases: [...PROFILE_PHASES],
+      layouts: (this.profileResults ?? []).map((r) => ({
+        layout: r.layout,
+        score: round1(r.score),
+        phaseTotals: roundMap(r.phaseTotals),
+        failures: r.failures,
+        perDiagram: r.perDiagram.map((d) => ({
+          diagram: d.diagram,
+          total: d.stats ? round1(d.stats.total) : null,
+          phases: d.stats ? roundMap(d.stats.phases) : null,
+          samples: d.stats?.samples ?? 0,
+          failures: d.failures,
+        })),
+      })),
+    };
+  }
+
+  async #copyProfileJson() {
+    const json = JSON.stringify(this.#profileResultsJson(), null, 2);
+    try {
+      await navigator.clipboard.writeText(json);
+      this.profileCopyMsg = 'Copied ✓';
+    } catch {
+      // Clipboard can be blocked (focus/permissions); fall back to the console.
+      console.log('[dev-explorer] profile results JSON:\n' + json);
+      this.profileCopyMsg = 'Clipboard blocked — logged to console';
+    }
+    setTimeout(() => {
+      this.profileCopyMsg = '';
+    }, 2500);
+  }
+
+  #profileInitConfig(layout: MermaidLayout) {
+    return {
+      startOnLoad: false,
+      securityLevel: 'strict',
+      maxTextSize: DEV_MAX_TEXT_SIZE,
+      maxEdges: DEV_MAX_EDGES,
+      theme: this.theme,
+      layout,
+      look: this.look,
+      // Quiet the logger during the batch so the console panel stays readable.
+      logLevel: 'error',
+      flowchart: {
+        useMaxWidth: this.useMaxWidth,
+        ignoreCrossLaneEdges: this.ignoreCrossLaneEdges,
+        optimizeRanksByCrossings: this.optimizeRanksByCrossings,
+      },
+    };
+  }
+
+  // Resolve the set of diagrams to profile: just the current file, or every
+  // sibling .mmd in the current folder. Sources are fetched up front so a slow
+  // fetch never lands inside a timed render.
+  async #resolveProfileDiagrams(): Promise<{ path: string; source: string }[]> {
+    if (this.profileScope === 'folder') {
+      const paths = this.siblings.length ? this.siblings : this.filePath ? [this.filePath] : [];
+      const diagrams: { path: string; source: string }[] = [];
+      for (const path of paths) {
+        try {
+          diagrams.push({ path, source: await this.#fetchSourceFor(path) });
+        } catch {
+          // Skip unreadable files rather than aborting the whole run.
+        }
+      }
+      return diagrams;
+    }
+    return this.source ? [{ path: this.filePath || '(current)', source: this.source }] : [];
+  }
+
   /**
-   * Run the current diagram through each selected layout `profileIterations`
-   * times with the render profiler enabled, then aggregate per-phase medians
-   * for a side-by-side comparison. Renders happen sequentially so the profiler's
-   * single phase stack stays consistent and timings don't contend on the main
-   * thread.
+   * Benchmark the selected diagram set across the selected layouts and produce a
+   * per-layout score (total render time, lower is better) so improvements are
+   * trackable run-to-run.
+   *
+   * Renders run sequentially (the profiler has a single phase stack and parallel
+   * renders would contend on the main thread). Each layout is warmed up once
+   * (untimed) to absorb the one-time dynamic layout-loader import, and each
+   * (diagram, layout) series drops its fastest and slowest run before averaging.
    */
   async #runProfile() {
     if (this.profileRunning) return;
@@ -831,66 +981,96 @@ export class DevDiagramViewer extends LitElement {
         'Profiling is not available in this build. Restart the dev server (`pnpm dev`) — it compiles mermaid with profiling enabled.';
       return;
     }
-    const source = this.source;
-    if (!source) {
-      this.profileError = 'No diagram is loaded to profile.';
-      return;
-    }
-    const layouts = this.profileLayouts.length ? this.profileLayouts : [this.layout];
-    const iterations = Math.max(1, Math.min(50, Math.round(this.profileIterations) || 1));
-
     const m = (await window.mermaidReady?.catch(() => undefined)) ?? window.mermaid;
     if (!m) {
       this.profileError = 'window.mermaid is not available.';
       return;
     }
 
+    const layouts = this.profileLayouts.length ? this.profileLayouts : [this.layout];
+    const iterations = Math.max(1, Math.min(50, Math.round(this.profileIterations) || 1));
+
     this.profileError = '';
     this.profileResults = null;
     this.profileRunning = true;
+    this.#profileCancel = false;
+
+    const diagrams = await this.#resolveProfileDiagrams();
+    if (diagrams.length === 0) {
+      this.profileError = 'No diagrams to profile.';
+      this.profileRunning = false;
+      return;
+    }
 
     const prevEnabled = profiler.enabled;
     const prevAutoPrint = profiler.autoPrint;
     profiler.enable();
     // Suppress the per-render console summary during a batch; we render our own table.
     profiler.autoPrint = false;
-    profiler.clear();
 
-    const failures: Record<string, number> = {};
+    const results: LayoutSetResult[] = [];
 
     try {
+      // Warmup: load each layout module + JIT once, untimed and discarded, so the
+      // one-time dynamic import doesn't inflate the first measured render.
+      this.profileProgress = 'warming up…';
+      await this.updateComplete;
       for (const layout of layouts) {
-        // Quiet the logger during the batch so the console panel stays readable.
-        await m.initialize({
-          startOnLoad: false,
-          securityLevel: 'strict',
-          theme: this.theme,
-          layout,
-          look: this.look,
-          logLevel: 'error',
-          flowchart: {
-            useMaxWidth: this.useMaxWidth,
-            ignoreCrossLaneEdges: this.ignoreCrossLaneEdges,
-            optimizeRanksByCrossings: this.optimizeRanksByCrossings,
-          },
-        });
-
-        for (let i = 0; i < iterations; i++) {
-          this.profileProgress = `${layout} ${i + 1}/${iterations}`;
-          // Let Lit flush the progress label before the (potentially long) render.
-          await this.updateComplete;
-          profiler.runLabel = layout;
-          const id = `dev-profile-${layout}-${i}-${Math.random().toString(16).slice(2)}`;
-          try {
-            await m.render(id, source);
-          } catch (e) {
-            failures[layout] = (failures[layout] ?? 0) + 1;
-            console.error(`[dev-explorer] profile render failed for layout=${layout}:`, e);
-          }
+        try {
+          await m.initialize(this.#profileInitConfig(layout));
+          await m.render(`dev-profile-warmup-${layout}`, diagrams[0].source);
+        } catch {
+          // A layout that can't render the first diagram is reported per-run below.
         }
       }
 
-      this.profileResults = aggregateProfile(profiler.records, layouts, failures);
+      const totalUnits = layouts.length * diagrams.length;
+      let unit = 0;
+      for (const layout of layouts) {
+        const perDiagram: DiagramResult[] = [];
+        for (const diagram of diagrams) {
+          if (this.#profileCancel) break;
+          unit++;
+          await m.initialize(this.#profileInitConfig(layout));
+          profiler.clear();
+          let failures = 0;
+          for (let i = 0; i < iterations; i++) {
+            if (this.#profileCancel) break;
+            this.profileProgress = `${layout} · ${baseName(diagram.path)} · ${i + 1}/${iterations} (${unit}/${totalUnits})`;
+            // Let Lit flush the progress label before the (potentially long) render.
+            await this.updateComplete;
+            profiler.runLabel = layout;
+            const id = `dev-profile-${unit}-${i}-${Math.random().toString(16).slice(2)}`;
+            try {
+              await m.render(id, diagram.source);
+            } catch (e) {
+              failures++;
+              console.error(
+                `[dev-explorer] profile render failed for layout=${layout} ${diagram.path}:`,
+                e
+              );
+            }
+          }
+          const samples = profiler.records.map((r) => sampleFromTree(r.tree));
+          perDiagram.push({ diagram: diagram.path, stats: trimmedStats(samples), failures });
+        }
+
+        const measured = perDiagram.filter((d) => d.stats);
+        const phaseTotals: Record<string, number> = {};
+        for (const phase of PROFILE_PHASES) {
+          phaseTotals[phase] = measured.reduce((s, d) => s + (d.stats?.phases[phase] ?? 0), 0);
+        }
+        results.push({
+          layout,
+          perDiagram,
+          score: measured.reduce((s, d) => s + (d.stats?.total ?? 0), 0),
+          phaseTotals,
+          failures: perDiagram.reduce((s, d) => s + d.failures, 0),
+        });
+        if (this.#profileCancel) break;
+      }
+
+      this.profileResults = results;
     } catch (e) {
       this.profileError = e instanceof Error ? e.message : String(e);
     } finally {
@@ -912,6 +1092,8 @@ export class DevDiagramViewer extends LitElement {
     const initConfig = {
       startOnLoad: false,
       securityLevel: 'strict',
+      maxTextSize: DEV_MAX_TEXT_SIZE,
+      maxEdges: DEV_MAX_EDGES,
       theme: this.theme,
       layout: this.layout,
       look: this.look,
@@ -1260,9 +1442,32 @@ export class DevDiagramViewer extends LitElement {
           .profile-fail {
             color: var(--sl-color-warning-600, #fbbf24);
           }
+          .profile-meta {
+            color: var(--sl-color-neutral-500, #888);
+            font-size: 12px;
+            margin: 10px 0 4px;
+          }
+          .profile-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 4px 0 8px;
+          }
         </style>
 
         <div class="profile-controls">
+          <div class="profile-iter">
+            <span class="label">Scope</span>
+            <sl-select
+              size="small"
+              value=${this.profileScope}
+              ?disabled=${this.profileRunning}
+              @sl-change=${(e: any) => this.#setProfileScope(e.target?.value)}
+            >
+              <sl-option value="diagram">This diagram</sl-option>
+              <sl-option value="folder">Folder (${this.siblings.length || 1})</sl-option>
+            </sl-select>
+          </div>
           <div class="profile-layouts">
             <span class="label">Layouts</span>
             ${ALL_LAYOUTS.map(
@@ -1293,14 +1498,21 @@ export class DevDiagramViewer extends LitElement {
             size="small"
             variant="primary"
             ?loading=${this.profileRunning}
-            ?disabled=${this.profileRunning || !this.source || this.profileLayouts.length === 0}
+            ?disabled=${this.profileRunning ||
+            this.profileLayouts.length === 0 ||
+            (this.profileScope === 'diagram' && !this.source)}
             @click=${() => void this.#runProfile()}
           >
             <sl-icon slot="prefix" name="stopwatch"></sl-icon>
             Run profile
           </sl-button>
           ${this.profileRunning
-            ? html`<span class="subtle">rendering ${this.profileProgress}…</span>`
+            ? html`
+                <sl-button size="small" variant="default" @click=${() => this.#cancelProfile()}>
+                  Stop
+                </sl-button>
+                <span class="subtle">${this.profileProgress}</span>
+              `
             : nothing}
         </div>
 
@@ -1308,23 +1520,53 @@ export class DevDiagramViewer extends LitElement {
           ? html`<div class="empty">Error: <span class="path">${this.profileError}</span></div>`
           : nothing}
         ${this.profileResults?.length
-          ? this.#renderProfileTable(this.profileResults)
+          ? html`
+              <div class="profile-actions">
+                <sl-button
+                  size="small"
+                  variant="default"
+                  ?disabled=${this.profileRunning}
+                  @click=${() => void this.#copyProfileJson()}
+                >
+                  <sl-icon slot="prefix" name="clipboard"></sl-icon>
+                  Copy JSON
+                </sl-button>
+                ${this.profileCopyMsg
+                  ? html`<span class="subtle">${this.profileCopyMsg}</span>`
+                  : nothing}
+              </div>
+              ${this.#renderProfileTable(this.profileResults)}
+            `
           : !this.profileRunning && !this.profileError
             ? html`<div class="subtle">
-                Pick layouts and click “Run profile”. Each runs ${this.profileIterations}× on the
-                current diagram; cells are median ms (min in grey). Phases are tree-shaken from
-                production builds.
+                Pick layouts and a scope, then “Run profile”. Each
+                ${this.profileScope === 'folder' ? 'diagram in the folder' : 'run'} renders
+                ${this.profileIterations}× per layout; the fastest and slowest runs are dropped and
+                the rest averaged. The score is total render time across the set (lower is better),
+                so you can track optimizations.
               </div>`
             : nothing}
       </div>
     `;
   }
 
-  #renderProfileTable(results: LayoutProfile[]) {
-    const finiteTotals = results.map((r) => r.total.median).filter((v) => Number.isFinite(v));
-    const bestTotal = finiteTotals.length ? Math.min(...finiteTotals) : NaN;
-    const rows: string[] = [...PROFILE_PHASES, 'total'];
+  #renderProfileTable(results: LayoutSetResult[]) {
+    const scores = results.map((r) => r.score).filter((v) => Number.isFinite(v) && v > 0);
+    const bestScore = scores.length ? Math.min(...scores) : NaN;
+    // All layouts share the same diagram order; use the longest list in case a
+    // run was cancelled mid-layout.
+    const diagrams =
+      results.reduce<DiagramResult[]>(
+        (best, r) => (r.perDiagram.length > best.length ? r.perDiagram : best),
+        []
+      ) ?? [];
+    const multi = diagrams.length > 1;
+
     return html`
+      <div class="profile-meta">
+        ${multi ? `${diagrams.length} diagrams` : diagrams[0] ? baseName(diagrams[0].diagram) : ''}
+        · warmup + drop fastest &amp; slowest · score = total ms (lower is better)
+      </div>
       <table class="profile-table">
         <thead>
           <tr>
@@ -1340,26 +1582,62 @@ export class DevDiagramViewer extends LitElement {
           </tr>
         </thead>
         <tbody>
-          ${rows.map((phase) => {
-            const isTotal = phase === 'total';
-            return html`
-              <tr class=${isTotal ? 'total' : ''}>
+          ${PROFILE_PHASES.map(
+            (phase) => html`
+              <tr>
                 <th class="phase">${phase}</th>
-                ${results.map((r) => {
-                  const stat = isTotal ? r.total : r.phases[phase];
-                  const isBest =
-                    isTotal && Number.isFinite(stat.median) && stat.median === bestTotal;
-                  return html`<td class=${isBest ? 'best' : ''}>
-                    ${fmtMs(stat.median)}${Number.isFinite(stat.min) && stat.samples > 1
-                      ? html`<span class="profile-min">${fmtMs(stat.min)}</span>`
-                      : nothing}
-                  </td>`;
-                })}
+                ${results.map((r) => html`<td>${fmtMs(r.phaseTotals[phase])}</td>`)}
               </tr>
-            `;
-          })}
+            `
+          )}
+          <tr class="total">
+            <th class="phase">score</th>
+            ${results.map((r) => {
+              const isBest = Number.isFinite(r.score) && r.score === bestScore;
+              return html`<td class=${isBest ? 'best' : ''}>${fmtMs(r.score)}</td>`;
+            })}
+          </tr>
         </tbody>
       </table>
+
+      ${multi
+        ? html`
+            <div class="profile-meta">per-diagram total (ms)</div>
+            <table class="profile-table">
+              <thead>
+                <tr>
+                  <th class="phase">diagram</th>
+                  ${results.map((r) => html`<th>${r.layout}</th>`)}
+                </tr>
+              </thead>
+              <tbody>
+                ${diagrams.map((d, di) => {
+                  const rowVals = results
+                    .map((r) => r.perDiagram[di]?.stats?.total)
+                    .filter((v): v is number => typeof v === 'number');
+                  const bestVal = rowVals.length ? Math.min(...rowVals) : NaN;
+                  return html`
+                    <tr>
+                      <th class="phase">${baseName(d.diagram)}</th>
+                      ${results.map((r) => {
+                        const dr = r.perDiagram[di];
+                        const v = dr?.stats?.total;
+                        const isBest = typeof v === 'number' && v === bestVal;
+                        return html`<td class=${isBest ? 'best' : ''}>
+                          ${dr?.stats
+                            ? fmtMs(v!)
+                            : dr?.failures
+                              ? html`<span class="profile-fail">fail</span>`
+                              : '–'}
+                        </td>`;
+                      })}
+                    </tr>
+                  `;
+                })}
+              </tbody>
+            </table>
+          `
+        : nothing}
     `;
   }
 }
