@@ -171,6 +171,19 @@ function phaseDuration(tree: ProfileSpanLike, phase: string): number | undefined
   return findSpan(tree, phase)?.duration;
 }
 
+// Time of the actual external library call (dagreLayout / elk.layout), captured
+// as a "layoutCore" span inside the layout phase. The rest of "layout" is our
+// own wrapper code (the part we can actually optimize).
+function layoutLibDuration(tree: ProfileSpanLike): number | undefined {
+  const layoutSpan = findSpan(tree, 'layout');
+  if (!layoutSpan) return undefined;
+  return findSpan(layoutSpan, 'layoutCore')?.duration;
+}
+
+// Keys carried in each RunStats: the visible phases plus the derived layout
+// split (external library vs. our wrapper).
+const STAT_KEYS: string[] = [...PROFILE_PHASES, 'layoutLib', 'layoutOurs'];
+
 function mean(values: number[]): number {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : NaN;
 }
@@ -181,6 +194,14 @@ function sampleFromTree(tree: ProfileSpanLike): RunSample {
   for (const phase of PROFILE_PHASES) {
     const d = phaseDuration(tree, phase);
     if (typeof d === 'number') phases[phase] = d;
+  }
+  // Split the layout phase into the external library call vs. our wrapper.
+  const lib = layoutLibDuration(tree);
+  if (typeof lib === 'number') {
+    phases.layoutLib = lib;
+    if (typeof phases.layout === 'number') {
+      phases.layoutOurs = Math.max(0, phases.layout - lib);
+    }
   }
   return { total: tree.duration, phases };
 }
@@ -194,7 +215,7 @@ function trimmedStats(samples: RunSample[]): RunStats | null {
     kept = [...samples].sort((a, b) => a.total - b.total).slice(1, -1);
   }
   const phases: Record<string, number> = {};
-  for (const phase of PROFILE_PHASES) {
+  for (const phase of STAT_KEYS) {
     const vals = kept.map((k) => k.phases[phase]).filter((v): v is number => typeof v === 'number');
     if (vals.length) {
       phases[phase] = mean(vals);
@@ -1057,7 +1078,7 @@ export class DevDiagramViewer extends LitElement {
 
         const measured = perDiagram.filter((d) => d.stats);
         const phaseTotals: Record<string, number> = {};
-        for (const phase of PROFILE_PHASES) {
+        for (const phase of STAT_KEYS) {
           phaseTotals[phase] = measured.reduce((s, d) => s + (d.stats?.phases[phase] ?? 0), 0);
         }
         results.push({
@@ -1453,6 +1474,14 @@ export class DevDiagramViewer extends LitElement {
             gap: 10px;
             margin: 4px 0 8px;
           }
+          .profile-table tr.sub-row th.phase {
+            padding-left: 30px;
+            font-weight: 400;
+            color: var(--sl-color-neutral-500, #888);
+          }
+          .profile-table tr.sub-row td {
+            color: var(--sl-color-neutral-500, #888);
+          }
         </style>
 
         <div class="profile-controls">
@@ -1582,14 +1611,32 @@ export class DevDiagramViewer extends LitElement {
           </tr>
         </thead>
         <tbody>
-          ${PROFILE_PHASES.map(
-            (phase) => html`
+          ${PROFILE_PHASES.flatMap((phase) => {
+            const row = html`
               <tr>
                 <th class="phase">${phase}</th>
                 ${results.map((r) => html`<td>${fmtMs(r.phaseTotals[phase])}</td>`)}
               </tr>
-            `
-          )}
+            `;
+            if (phase !== 'layout') {
+              return [row];
+            }
+            // Break "layout" into the external library call vs. our wrapper.
+            const subRow = (label: string, key: string) => html`
+              <tr class="sub-row">
+                <th class="phase">${label}</th>
+                ${results.map((r) => {
+                  const v = r.phaseTotals[key];
+                  return html`<td>${v > 0 ? fmtMs(v) : '–'}</td>`;
+                })}
+              </tr>
+            `;
+            return [
+              row,
+              subRow('↳ lib (external)', 'layoutLib'),
+              subRow('↳ ours (wrapper)', 'layoutOurs'),
+            ];
+          })}
           <tr class="total">
             <th class="phase">score</th>
             ${results.map((r) => {

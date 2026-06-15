@@ -406,7 +406,15 @@ const measureAndRunDagreLayoutCore = async (
   log.info('###                Layout                 ### XXX');
   log.info('############################################# XXX');
 
+  // Time the actual external dagre call on its own ("layoutCore"); the rest of
+  // this function is our wrapper (DOM, graph (de)serialization, …).
+  if (injected.profiling) {
+    profiler.begin('layoutCore');
+  }
   dagreLayout(graph);
+  if (injected.profiling) {
+    profiler.end(); // layoutCore
+  }
 
   log.info('Graph after layout:', JSON.stringify(graphlibJson.write(graph)));
 
