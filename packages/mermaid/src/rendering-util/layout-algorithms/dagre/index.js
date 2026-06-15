@@ -1,7 +1,9 @@
+/* global injected */ // build-time constant injected via esbuild `define` (see .esbuild/util.ts)
 import { layout as dagreLayout } from 'dagre-d3-es/src/dagre/index.js';
 import * as graphlibJson from 'dagre-d3-es/src/graphlib/json.js';
 import * as graphlib from 'dagre-d3-es/src/graphlib/index.js';
 import { createCommonLayoutRenderer } from '../common/index.js';
+import { profiler } from '../../../profiler.js';
 import { updateNodeBounds } from '../../rendering-elements/shapes/util.js';
 import {
   clusterDb,
@@ -248,6 +250,16 @@ const measureAndRunDagreLayoutCore = async (
   const dir = graph.graph().rankdir;
   log.trace('Dir in recursive render - dir:', dir);
 
+  // Profiling: bracket the DOM node-sizing work (group setup, insertNode/getBBox,
+  // edge labels) as "measure". Unlike elk, dagre supplies a no-op measureLayout
+  // hook and measures here inside the layout core, so without this its measure
+  // phase reads 0 and this cost is hidden inside "layout". Ending the span before
+  // dagreLayout() leaves the common "layout" span = measure + algorithm, so the
+  // profiler UI can report measure on its own and layout as pure algorithm.
+  if (injected.profiling) {
+    profiler.begin('measure');
+  }
+
   const elem = _elem.insert('g').attr('class', 'root');
   if (!graph.nodes()) {
     log.info('No nodes found for', graph);
@@ -383,6 +395,10 @@ const measureAndRunDagreLayoutCore = async (
   };
 
   await processEdges();
+
+  if (injected.profiling) {
+    profiler.end(); // measure
+  }
 
   log.info('Graph before layout:', JSON.stringify(graphlibJson.write(graph)));
 
