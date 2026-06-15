@@ -38,6 +38,20 @@ type CapturedSizesEntry = {
   };
 };
 
+// Shape of the render profiler exposed by mermaid dev/profiling builds as
+// `window.__mermaidProfiler` (see packages/mermaid/src/profiler.ts).
+type ProfileSpanLike = { name: string; duration: number; children: ProfileSpanLike[] };
+type ProfileRecordLike = { label: string; tree: ProfileSpanLike };
+type MermaidProfiler = {
+  enabled: boolean;
+  autoPrint: boolean;
+  runLabel?: string;
+  records: ProfileRecordLike[];
+  enable: () => void;
+  disable: () => void;
+  clear: () => void;
+};
+
 declare global {
   interface Window {
     mermaid?: MermaidIife;
@@ -45,6 +59,7 @@ declare global {
     mermaidCaptureSizes?: boolean;
     mermaidCapturedSizes?: CapturedSizesEntry[];
     mermaidLastCapturedSizes?: CapturedSizesEntry;
+    __mermaidProfiler?: MermaidProfiler;
   }
 }
 
@@ -90,7 +105,69 @@ type MermaidTheme =
 type MermaidLayout = 'dagre' | 'elk' | 'domus' | 'hola' | 'swimlane';
 type MermaidLook = 'classic' | 'handDrawn' | 'neo';
 type MermaidLogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-type ViewerTab = 'diagram' | 'code';
+type ViewerTab = 'diagram' | 'code' | 'profile';
+
+const ALL_LAYOUTS: MermaidLayout[] = ['dagre', 'elk', 'domus', 'hola', 'swimlane'];
+
+// Phases emitted by the profiler tree, in display order. "total" is taken from
+// the root `render` span. See packages/mermaid/src/profiler.ts.
+const PROFILE_PHASES = ['parse', 'prepare', 'measure', 'layout', 'paint', 'serialize'] as const;
+
+type PhaseStat = { median: number; min: number; samples: number };
+type LayoutProfile = {
+  layout: string;
+  phases: Record<string, PhaseStat>;
+  total: PhaseStat;
+  /** Number of renders that failed for this layout (excluded from stats). */
+  failures: number;
+};
+
+function findSpan(tree: ProfileSpanLike, name: string): ProfileSpanLike | undefined {
+  if (tree.name === name) return tree;
+  for (const child of tree.children) {
+    const found = findSpan(child, name);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return NaN;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function statFor(values: number[]): PhaseStat {
+  return {
+    median: median(values),
+    min: values.length ? Math.min(...values) : NaN,
+    samples: values.length,
+  };
+}
+
+function aggregateProfile(
+  records: ProfileRecordLike[],
+  layouts: string[],
+  failures: Record<string, number>
+): LayoutProfile[] {
+  return layouts.map((layout) => {
+    const recs = records.filter((r) => r.label === layout);
+    const phases: Record<string, PhaseStat> = {};
+    for (const phase of PROFILE_PHASES) {
+      const values = recs
+        .map((r) => findSpan(r.tree, phase)?.duration)
+        .filter((v): v is number => typeof v === 'number');
+      phases[phase] = statFor(values);
+    }
+    const totals = recs.map((r) => r.tree.duration).filter((v) => typeof v === 'number');
+    return { layout, phases, total: statFor(totals), failures: failures[layout] ?? 0 };
+  });
+}
+
+function fmtMs(n: number): string {
+  return Number.isFinite(n) ? n.toFixed(1) : '–';
+}
 
 const DEFAULT_THEME: MermaidTheme = 'default';
 const DEFAULT_LAYOUT: MermaidLayout = 'dagre';
@@ -206,6 +283,12 @@ export class DevDiagramViewer extends LitElement {
     sizesSaving: { state: true },
     sizesMessage: { state: true },
     siblings: { state: true },
+    profileLayouts: { state: true },
+    profileIterations: { state: true },
+    profileRunning: { state: true },
+    profileProgress: { state: true },
+    profileError: { state: true },
+    profileResults: { state: true },
   };
 
   declare filePath: string;
@@ -231,6 +314,12 @@ export class DevDiagramViewer extends LitElement {
   declare sizesSaving: boolean;
   declare sizesMessage: string;
   declare siblings: string[];
+  declare profileLayouts: MermaidLayout[];
+  declare profileIterations: number;
+  declare profileRunning: boolean;
+  declare profileProgress: string;
+  declare profileError: string;
+  declare profileResults: LayoutProfile[] | null;
 
   #renderSeq = 0;
   #consolePatched = false;
@@ -313,6 +402,19 @@ export class DevDiagramViewer extends LitElement {
     this.sizesSaving = false;
     this.sizesMessage = '';
     this.siblings = [];
+
+    const storedProfileLayouts = readStorage('devExplorer.viewer.profileLayouts');
+    const parsedProfileLayouts = (storedProfileLayouts?.split(',') ?? []).filter(
+      (v): v is MermaidLayout => isLayout(v)
+    );
+    this.profileLayouts = parsedProfileLayouts.length ? parsedProfileLayouts : ['dagre', 'elk'];
+    const storedIterations = Number(readStorage('devExplorer.viewer.profileIterations'));
+    this.profileIterations =
+      Number.isFinite(storedIterations) && storedIterations >= 1 ? storedIterations : 5;
+    this.profileRunning = false;
+    this.profileProgress = '';
+    this.profileError = '';
+    this.profileResults = null;
   }
 
   createRenderRoot() {
@@ -698,6 +800,107 @@ export class DevDiagramViewer extends LitElement {
     }
   }
 
+  #toggleProfileLayout(layout: MermaidLayout, checked: boolean) {
+    const next = checked
+      ? [...new Set([...this.profileLayouts, layout])]
+      : this.profileLayouts.filter((l) => l !== layout);
+    // Keep canonical order so the comparison columns are stable.
+    this.profileLayouts = ALL_LAYOUTS.filter((l) => next.includes(l));
+    writeStorage('devExplorer.viewer.profileLayouts', this.profileLayouts.join(','));
+  }
+
+  #setProfileIterations(value: number) {
+    const clamped = Math.max(1, Math.min(50, Math.round(value) || 1));
+    this.profileIterations = clamped;
+    writeStorage('devExplorer.viewer.profileIterations', String(clamped));
+  }
+
+  /**
+   * Run the current diagram through each selected layout `profileIterations`
+   * times with the render profiler enabled, then aggregate per-phase medians
+   * for a side-by-side comparison. Renders happen sequentially so the profiler's
+   * single phase stack stays consistent and timings don't contend on the main
+   * thread.
+   */
+  async #runProfile() {
+    if (this.profileRunning) return;
+
+    const profiler = window.__mermaidProfiler;
+    if (!profiler) {
+      this.profileError =
+        'Profiling is not available in this build. Restart the dev server (`pnpm dev`) — it compiles mermaid with profiling enabled.';
+      return;
+    }
+    const source = this.source;
+    if (!source) {
+      this.profileError = 'No diagram is loaded to profile.';
+      return;
+    }
+    const layouts = this.profileLayouts.length ? this.profileLayouts : [this.layout];
+    const iterations = Math.max(1, Math.min(50, Math.round(this.profileIterations) || 1));
+
+    const m = (await window.mermaidReady?.catch(() => undefined)) ?? window.mermaid;
+    if (!m) {
+      this.profileError = 'window.mermaid is not available.';
+      return;
+    }
+
+    this.profileError = '';
+    this.profileResults = null;
+    this.profileRunning = true;
+
+    const prevEnabled = profiler.enabled;
+    const prevAutoPrint = profiler.autoPrint;
+    profiler.enable();
+    // Suppress the per-render console summary during a batch; we render our own table.
+    profiler.autoPrint = false;
+    profiler.clear();
+
+    const failures: Record<string, number> = {};
+
+    try {
+      for (const layout of layouts) {
+        // Quiet the logger during the batch so the console panel stays readable.
+        await m.initialize({
+          startOnLoad: false,
+          securityLevel: 'strict',
+          theme: this.theme,
+          layout,
+          look: this.look,
+          logLevel: 'error',
+          flowchart: {
+            useMaxWidth: this.useMaxWidth,
+            ignoreCrossLaneEdges: this.ignoreCrossLaneEdges,
+            optimizeRanksByCrossings: this.optimizeRanksByCrossings,
+          },
+        });
+
+        for (let i = 0; i < iterations; i++) {
+          this.profileProgress = `${layout} ${i + 1}/${iterations}`;
+          // Let Lit flush the progress label before the (potentially long) render.
+          await this.updateComplete;
+          profiler.runLabel = layout;
+          const id = `dev-profile-${layout}-${i}-${Math.random().toString(16).slice(2)}`;
+          try {
+            await m.render(id, source);
+          } catch (e) {
+            failures[layout] = (failures[layout] ?? 0) + 1;
+            console.error(`[dev-explorer] profile render failed for layout=${layout}:`, e);
+          }
+        }
+      }
+
+      this.profileResults = aggregateProfile(profiler.records, layouts, failures);
+    } catch (e) {
+      this.profileError = e instanceof Error ? e.message : String(e);
+    } finally {
+      profiler.autoPrint = prevAutoPrint;
+      if (!prevEnabled) profiler.disable();
+      this.profileRunning = false;
+      this.profileProgress = '';
+    }
+  }
+
   async #renderMermaid(text: string) {
     const m = (await window.mermaidReady?.catch(() => undefined)) ?? window.mermaid;
     if (!m) {
@@ -903,7 +1106,9 @@ export class DevDiagramViewer extends LitElement {
           active-tab=${this.activeTab}
           @sl-tab-show=${(e: any) => {
             const name = e.detail?.name;
-            if (name === 'diagram' || name === 'code') this.#setActiveTab(name);
+            if (name === 'diagram' || name === 'code' || name === 'profile') {
+              this.#setActiveTab(name);
+            }
           }}
         >
           <sl-tab slot="nav" panel="diagram">
@@ -913,6 +1118,10 @@ export class DevDiagramViewer extends LitElement {
           <sl-tab slot="nav" panel="code">
             <sl-icon name="file-earmark-code"></sl-icon>
             Code
+          </sl-tab>
+          <sl-tab slot="nav" panel="profile">
+            <sl-icon name="speedometer2"></sl-icon>
+            Profile
           </sl-tab>
 
           <sl-tab-panel name="diagram">
@@ -975,8 +1184,182 @@ export class DevDiagramViewer extends LitElement {
               ></dev-code-editor>
             </div>
           </sl-tab-panel>
+
+          <sl-tab-panel name="profile">${this.#renderProfilePanel()}</sl-tab-panel>
         </sl-tab-group>
       </div>
+    `;
+  }
+
+  #renderProfilePanel() {
+    // cspell:ignore nums
+    return html`
+      <div class="profile-pane">
+        <style>
+          .profile-pane {
+            padding: 12px;
+            height: 100%;
+            overflow: auto;
+          }
+          .profile-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 14px;
+          }
+          .profile-layouts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+          }
+          .profile-iter {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+          .profile-iter input {
+            width: 64px;
+            padding: 3px 6px;
+            background: var(--sl-input-background-color, #222);
+            color: inherit;
+            border: 1px solid var(--sl-color-neutral-300, #555);
+            border-radius: 4px;
+          }
+          .profile-table {
+            border-collapse: collapse;
+            font-variant-numeric: tabular-nums;
+            font-size: 13px;
+          }
+          .profile-table th,
+          .profile-table td {
+            padding: 4px 14px;
+            text-align: right;
+            border-bottom: 1px solid var(--sl-color-neutral-200, #3a3a3a);
+            white-space: nowrap;
+          }
+          .profile-table th.phase,
+          .profile-table td.phase {
+            text-align: left;
+            color: var(--sl-color-neutral-600, #aaa);
+          }
+          .profile-table tr.total td,
+          .profile-table tr.total th {
+            font-weight: 600;
+            border-top: 2px solid var(--sl-color-neutral-300, #555);
+          }
+          .profile-table td.best {
+            color: var(--sl-color-success-600, #4ade80);
+          }
+          .profile-min {
+            color: var(--sl-color-neutral-500, #888);
+            font-size: 11px;
+            margin-left: 6px;
+          }
+          .profile-fail {
+            color: var(--sl-color-warning-600, #fbbf24);
+          }
+        </style>
+
+        <div class="profile-controls">
+          <div class="profile-layouts">
+            <span class="label">Layouts</span>
+            ${ALL_LAYOUTS.map(
+              (layout) => html`
+                <sl-checkbox
+                  size="small"
+                  ?checked=${this.profileLayouts.includes(layout)}
+                  ?disabled=${this.profileRunning}
+                  @sl-change=${(e: any) =>
+                    this.#toggleProfileLayout(layout, Boolean(e.target?.checked))}
+                  >${layout}</sl-checkbox
+                >
+              `
+            )}
+          </div>
+          <div class="profile-iter">
+            <span class="label">Iterations</span>
+            <input
+              type="number"
+              min="1"
+              max="50"
+              .value=${String(this.profileIterations)}
+              ?disabled=${this.profileRunning}
+              @change=${(e: any) => this.#setProfileIterations(Number(e.target?.value))}
+            />
+          </div>
+          <sl-button
+            size="small"
+            variant="primary"
+            ?loading=${this.profileRunning}
+            ?disabled=${this.profileRunning || !this.source || this.profileLayouts.length === 0}
+            @click=${() => void this.#runProfile()}
+          >
+            <sl-icon slot="prefix" name="stopwatch"></sl-icon>
+            Run profile
+          </sl-button>
+          ${this.profileRunning
+            ? html`<span class="subtle">rendering ${this.profileProgress}…</span>`
+            : nothing}
+        </div>
+
+        ${this.profileError
+          ? html`<div class="empty">Error: <span class="path">${this.profileError}</span></div>`
+          : nothing}
+        ${this.profileResults?.length
+          ? this.#renderProfileTable(this.profileResults)
+          : !this.profileRunning && !this.profileError
+            ? html`<div class="subtle">
+                Pick layouts and click “Run profile”. Each runs ${this.profileIterations}× on the
+                current diagram; cells are median ms (min in grey). Phases are tree-shaken from
+                production builds.
+              </div>`
+            : nothing}
+      </div>
+    `;
+  }
+
+  #renderProfileTable(results: LayoutProfile[]) {
+    const finiteTotals = results.map((r) => r.total.median).filter((v) => Number.isFinite(v));
+    const bestTotal = finiteTotals.length ? Math.min(...finiteTotals) : NaN;
+    const rows: string[] = [...PROFILE_PHASES, 'total'];
+    return html`
+      <table class="profile-table">
+        <thead>
+          <tr>
+            <th class="phase">phase</th>
+            ${results.map(
+              (r) =>
+                html`<th>
+                  ${r.layout}${r.failures
+                    ? html`<span class="profile-fail"> ⚠${r.failures}</span>`
+                    : nothing}
+                </th>`
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((phase) => {
+            const isTotal = phase === 'total';
+            return html`
+              <tr class=${isTotal ? 'total' : ''}>
+                <th class="phase">${phase}</th>
+                ${results.map((r) => {
+                  const stat = isTotal ? r.total : r.phases[phase];
+                  const isBest =
+                    isTotal && Number.isFinite(stat.median) && stat.median === bestTotal;
+                  return html`<td class=${isBest ? 'best' : ''}>
+                    ${fmtMs(stat.median)}${Number.isFinite(stat.min) && stat.samples > 1
+                      ? html`<span class="profile-min">${fmtMs(stat.min)}</span>`
+                      : nothing}
+                  </td>`;
+                })}
+              </tr>
+            `;
+          })}
+        </tbody>
+      </table>
     `;
   }
 }

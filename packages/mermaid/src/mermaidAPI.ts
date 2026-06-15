@@ -30,6 +30,7 @@ import { evaluate } from './diagrams/common/common.js';
 import errorRenderer from './diagrams/error/errorRenderer.js';
 import { attachFunctions } from './interactionDb.js';
 import { log, setLogLevel } from './logger.js';
+import { profiler } from './profiler.js';
 import { preprocessDiagram } from './preprocess.js';
 import getStyles, { cssStyleSheetToString } from './styles.js';
 import theme from './themes/index.js';
@@ -436,6 +437,10 @@ const render = async function (
 ): Promise<RenderResult> {
   addDiagrams();
 
+  if (injected.profiling) {
+    profiler.start('render');
+  }
+
   const processed = processAndSetConfigs(text);
   text = processed.code;
 
@@ -517,7 +522,9 @@ const render = async function (
   let parseEncounteredException;
 
   try {
-    diag = await Diagram.fromText(text, { title: processed.title });
+    diag = injected.profiling
+      ? await profiler.span('parse', () => Diagram.fromText(text, { title: processed.title }))
+      : await Diagram.fromText(text, { title: processed.title });
   } catch (error) {
     if (config.suppressErrorRendering) {
       removeTempElements();
@@ -548,7 +555,11 @@ const render = async function (
   // -------------------------------------------------------------------------------
   // Draw the diagram with the renderer
   try {
-    await diag.renderer.draw(text, id, injected.version, diag);
+    if (injected.profiling) {
+      await profiler.span('draw', () => diag.renderer.draw(text, id, injected.version, diag));
+    } else {
+      await diag.renderer.draw(text, id, injected.version, diag);
+    }
   } catch (e) {
     if (config.suppressErrorRendering) {
       removeTempElements();
@@ -563,6 +574,11 @@ const render = async function (
   const a11yTitle: string | undefined = diag.db.getAccTitle?.();
   const a11yDescr: string | undefined = diag.db.getAccDescription?.();
   addA11yInfo(diagramType, svgNode, a11yTitle, a11yDescr);
+  if (injected.profiling) {
+    // "paint after layout" tail: SVG serialization + sanitization, which can
+    // dominate for very large diagrams.
+    profiler.begin('serialize');
+  }
   // -------------------------------------------------------------------------------
   // Clean up SVG code
   root.select(`[id="${id}"]`).selectAll('foreignobject > *').attr('xmlns', XMLNS_XHTML_STD);
@@ -587,11 +603,19 @@ const render = async function (
 
   attachFunctions();
 
+  if (injected.profiling) {
+    profiler.end(); // serialize
+  }
+
   if (parseEncounteredException) {
     throw parseEncounteredException;
   }
 
   removeTempElements();
+
+  if (injected.profiling) {
+    profiler.stop(); // render
+  }
 
   return {
     diagramType,
