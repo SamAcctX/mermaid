@@ -58,7 +58,12 @@ export const labelHelper = async <T extends SVGGraphicsElement>(
     getConfig()
   );
 
-  // Get the size of the label
+  // Get the size of the label.
+  // The `&& profiler.tickSync` guard tolerates an older shared profiler instance
+  // (from a different mermaid version sharing the page's `__mermaidProfiler`) that
+  // predates `tickSync` — fall back to a plain read. In production the whole
+  // `injected.profiling` ternary folds away to just the direct read. Same pattern
+  // applies to the other guarded `getBBox`/`getBoundingClientRect` reads below.
   let bbox =
     injected.profiling && profiler.tickSync
       ? profiler.tickSync('getBBox', () => text.getBBox())
