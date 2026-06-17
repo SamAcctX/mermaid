@@ -63,6 +63,9 @@ export const labelHelper = async <T extends SVGGraphicsElement>(
   // (below); `text` is the oversized foreignObject, so its getBBox() would be
   // discarded. Only measure the SVG <text> path here — skipping the dead read
   // avoids a forced reflow per node, a significant cost on large diagrams.
+  // (The `&& profiler.tickSync` guards on the reads below tolerate an older shared
+  // profiler instance that predates `tickSync`; in production the whole
+  // `injected.profiling` ternary folds away to a direct read.)
   const halfPadding = (node?.padding ?? 0) / 2;
   let bbox: DOMRect;
 
