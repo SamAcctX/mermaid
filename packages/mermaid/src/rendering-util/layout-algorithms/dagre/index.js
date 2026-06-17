@@ -1,8 +1,10 @@
+/* global injected */ // build-time constant injected via esbuild `define` (see .esbuild/util.ts)
 import { layout as dagreLayout } from 'dagre-d3-es/src/dagre/index.js';
 import * as graphlibJson from 'dagre-d3-es/src/graphlib/json.js';
 import * as graphlib from 'dagre-d3-es/src/graphlib/index.js';
 import { createLayoutElementGroups, insertMeasuredNode } from '../../createGraph.js';
 import { createCommonLayoutRenderer } from '../common/index.js';
+import { profiler } from '../../../profiler.js';
 import { updateNodeBounds } from '../../rendering-elements/shapes/util.js';
 import {
   clusterDb,
@@ -435,7 +437,15 @@ const runDagreGraphLayout = (graph) => {
   log.info('###                Layout                 ### XXX');
   log.info('############################################# XXX');
 
+  // Time the actual external dagre call on its own ("layoutCore"); the rest of
+  // this function is our wrapper (DOM, graph (de)serialization, …).
+  if (injected.profiling) {
+    profiler.begin('layoutCore');
+  }
   dagreLayout(graph);
+  if (injected.profiling) {
+    profiler.end(); // layoutCore
+  }
 
   log.info('Graph after layout:', JSON.stringify(graphlibJson.write(graph)));
 };
