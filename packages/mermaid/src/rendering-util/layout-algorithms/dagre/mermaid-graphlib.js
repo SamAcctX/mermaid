@@ -1,7 +1,6 @@
 /** Decorates with functions required by mermaids dagre-wrapper. */
 import { log } from '../../../logger.js';
 import * as graphlib from 'dagre-d3-es/src/graphlib/index.js';
-import * as graphlibJson from 'dagre-d3-es/src/graphlib/json.js';
 
 export let clusterDb = new Map();
 let descendants = new Map();
@@ -323,14 +322,16 @@ export const adjustClustersAndEdges = (graph, depth) => {
       graph.setEdge(v, w, edge, e.name);
     }
   });
-  log.debug('Adjusted Graph', graphlibJson.write(graph));
+  // perf: skip eager graphlibJson.write() serialization (the arg runs every render even when the log is a no-op)
+  // log.debug('Adjusted Graph', graphlibJson.write(graph));
   extractor(graph, 0);
 
   log.trace(clusterDb);
 };
 
 export const extractor = (graph, depth) => {
-  log.debug('extractor - ', depth, graphlibJson.write(graph), graph.children('D'));
+  // perf: skip eager graphlibJson.write() serialization (the arg runs every render even when the log is a no-op)
+  // log.debug('extractor - ', depth, graphlibJson.write(graph), graph.children('D'));
   if (depth > 10) {
     log.error('Bailing out');
     return;
@@ -398,11 +399,12 @@ export const extractor = (graph, depth) => {
         label: clusterDb.get(node).label,
         graph: clusterGraph,
       });
-      log.debug(
-        'Subgraph for cluster with explicit dir created:',
-        node,
-        graphlibJson.write(clusterGraph)
-      );
+      // perf: skip eager graphlibJson.write() serialization (the arg runs every render even when the log is a no-op)
+      // log.debug(
+      //   'Subgraph for cluster with explicit dir created:',
+      //   node,
+      //   graphlibJson.write(clusterGraph)
+      // );
     } else if (
       !clusterDb.get(node).externalConnections &&
       graph.children(node) &&
@@ -447,7 +449,8 @@ export const extractor = (graph, depth) => {
         label: clusterDb.get(node).label,
         graph: clusterGraph,
       });
-      log.debug('Old graph after copy', graphlibJson.write(graph));
+      // perf: skip eager graphlibJson.write() serialization (the arg runs every render even when the log is a no-op)
+      // log.debug('Old graph after copy', graphlibJson.write(graph));
     } else {
       log.debug(
         'Cluster ** ',
