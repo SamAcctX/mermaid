@@ -32,13 +32,15 @@ pnpm run argos:batch
 
 ## Configuration
 
-| Env var                 | Default                | Description                   |
-| ----------------------- | ---------------------- | ----------------------------- |
-| `ARGOS_SCREENSHOT_DIR`  | `cypress/screenshots`  | Input directory               |
-| `ARGOS_SHEETS_DIR`      | `cypress/argos-sheets` | Output directory              |
-| `ARGOS_TILES_PER_SHEET` | `12`                   | Max tiles per composite sheet |
-| `ARGOS_SHEET_COLS`      | `3`                    | Grid columns per sheet        |
-| `ARGOS_SHEET_SCALE`     | `2`                    | Output scale (2 = 2× pixels)  |
+| Env var                   | Default                | Description                         |
+| ------------------------- | ---------------------- | ----------------------------------- |
+| `ARGOS_SCREENSHOT_DIR`    | `cypress/screenshots`  | Input directory                     |
+| `ARGOS_SHEETS_DIR`        | `cypress/argos-sheets` | Output directory                    |
+| `ARGOS_TILES_PER_SHEET`   | `12`                   | Max tiles per composite sheet       |
+| `ARGOS_SHEET_COLS`        | `3`                    | Grid columns per sheet              |
+| `ARGOS_SHEET_SCALE`       | `2`                    | Output scale (2 = 2× pixels)        |
+| `ARGOS_TILE_WIDTH`        | `1440`                 | Fixed cell width (Cypress viewport) |
+| `ARGOS_TILE_IMAGE_HEIGHT` | `1024`                 | Fixed image slot height             |
 
 CI upload tokens:
 
@@ -47,4 +49,4 @@ CI upload tokens:
 | Batched sheets | `ARGOS_BATCHED_TOKEN` | `mermaid-batched` |
 | Per-screenshot | `ARGOS_TOKEN`         | `mermaid`         |
 
-Sheets are grouped by diagram folder (the path prefix before the `*.spec.*` directory segment Cypress inserts). Each sheet has a sibling `.json` manifest listing tile names, positions, and source paths for traceability.
+Sheets are grouped by diagram folder (the path prefix before the `*.spec.*` directory segment Cypress inserts). Each cell uses a fixed 1440×1024 image slot (matching the Cypress viewport) so one diagram changing size does not alter grid layout or sibling tiles. Each sheet has a sibling `.json` manifest listing tile names, positions, and source paths for traceability.

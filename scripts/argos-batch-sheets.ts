@@ -7,7 +7,8 @@
  * CLI usage:
  *   pnpm run argos:batch
  *   ARGOS_SCREENSHOT_DIR=cypress/screenshots ARGOS_SHEETS_DIR=cypress/argos-sheets
- *     ARGOS_TILES_PER_SHEET=12 ARGOS_SHEET_COLS=3 ARGOS_SHEET_SCALE=2 pnpm run argos:batch
+ *     ARGOS_TILES_PER_SHEET=12 ARGOS_SHEET_COLS=3 ARGOS_SHEET_SCALE=2
+ *     ARGOS_TILE_WIDTH=1440 ARGOS_TILE_IMAGE_HEIGHT=1024 pnpm run argos:batch
  */
 
 import { readdir, mkdir, writeFile } from 'node:fs/promises';
@@ -20,6 +21,9 @@ const SPEC_SEGMENT_RE = /\.spec\.[cm]?[jt]s$/;
 
 /** Fixed label band under each screenshot tile (deterministic grid sizing). */
 export const LABEL_HEIGHT = 24;
+/** Matches cypress.config.ts viewport — every cell uses this slot, not max(tile). */
+export const DEFAULT_TILE_WIDTH = 1440;
+export const DEFAULT_TILE_IMAGE_HEIGHT = 1024;
 const LABEL_FONT_SIZE = 11;
 const LABEL_PADDING = 4;
 const GRID_LINE_WIDTH = 1;
@@ -171,12 +175,18 @@ export interface ComposeSheetOptions {
   background?: { r: number; g: number; b: number; alpha: number };
   /** Output scale factor (1 = native screenshot size, 2 = 2× pixels). */
   scale?: number;
+  /** Fixed image slot width in pixels before scale (default: Cypress viewport width). */
+  tileWidth?: number;
+  /** Fixed image slot height in pixels before scale (default: Cypress viewport height). */
+  tileImageHeight?: number;
 }
 
 export interface WriteSheetsOptions {
   inputDir: string;
   outDir: string;
   scale?: number;
+  tileWidth?: number;
+  tileImageHeight?: number;
 }
 
 /** Maps a screenshot path to its diagram folder (prefix before the `*.spec.*` segment). */
@@ -258,17 +268,11 @@ export async function composeSheet(
 ): Promise<{ buffer: Buffer; manifest: SheetManifest }> {
   const { inputDir } = options;
   const background = options.background ?? { r: 255, g: 255, b: 255, alpha: 1 };
-  const scale = options.scale ?? 1;
   const { cols } = plan;
 
-  const dims = await Promise.all(
-    plan.tiles.map(async (t) => {
-      const meta = await sharp(join(inputDir, t.source)).metadata();
-      return { width: meta.width ?? 0, height: meta.height ?? 0 };
-    })
-  );
-  const baseCellWidth = Math.max(...dims.map((d) => d.width));
-  const baseImageHeight = Math.max(...dims.map((d) => d.height));
+  const scale = options.scale ?? 1;
+  const baseCellWidth = options.tileWidth ?? DEFAULT_TILE_WIDTH;
+  const baseImageHeight = options.tileImageHeight ?? DEFAULT_TILE_IMAGE_HEIGHT;
   const cellWidth = scaled(baseCellWidth, scale);
   const imageHeight = scaled(baseImageHeight, scale);
   const labelHeight = scaled(LABEL_HEIGHT, scale);
@@ -279,9 +283,11 @@ export async function composeSheet(
   const rows = Math.max(...plan.tiles.map((t) => t.row)) + 1;
 
   const tileBuffers = await Promise.all(
-    plan.tiles.map((t, i) =>
+    plan.tiles.map((t) =>
       sharp(join(inputDir, t.source))
-        .resize(scaled(dims[i].width, scale), scaled(dims[i].height, scale), {
+        .resize(cellWidth, imageHeight, {
+          fit: 'inside',
+          withoutEnlargement: true,
           kernel: sharp.kernel.lanczos3,
         })
         .png({ compressionLevel: 9 })
@@ -364,6 +370,8 @@ export async function writeSheets(plans: Sheet[], options: WriteSheetsOptions): 
     const { buffer, manifest } = await composeSheet(plan, {
       inputDir: options.inputDir,
       scale: options.scale,
+      tileWidth: options.tileWidth,
+      tileImageHeight: options.tileImageHeight,
     });
     const sheetPath = join(options.outDir, plan.output);
     await mkdir(dirname(sheetPath), { recursive: true });
@@ -378,10 +386,12 @@ async function main(): Promise<void> {
   const tilesPerSheet = Number(process.env.ARGOS_TILES_PER_SHEET ?? 12);
   const cols = Number(process.env.ARGOS_SHEET_COLS ?? 3);
   const scale = Number(process.env.ARGOS_SHEET_SCALE ?? DEFAULT_SHEET_SCALE);
+  const tileWidth = Number(process.env.ARGOS_TILE_WIDTH ?? DEFAULT_TILE_WIDTH);
+  const tileImageHeight = Number(process.env.ARGOS_TILE_IMAGE_HEIGHT ?? DEFAULT_TILE_IMAGE_HEIGHT);
 
   const relPaths = await collectScreenshots(inputDir);
   const plans = planSheets(relPaths, { tilesPerSheet, cols });
-  await writeSheets(plans, { inputDir, outDir, scale });
+  await writeSheets(plans, { inputDir, outDir, scale, tileWidth, tileImageHeight });
   process.stdout.write(
     `[argos-batch] ${relPaths.length} screenshots → ${plans.length} sheets in ${outDir}\n`
   );

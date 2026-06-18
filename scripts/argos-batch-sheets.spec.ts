@@ -10,7 +10,12 @@ import {
   composeSheet,
   formatTileTitle,
   LABEL_HEIGHT,
+  DEFAULT_TILE_WIDTH,
+  DEFAULT_TILE_IMAGE_HEIGHT,
 } from './argos-batch-sheets.ts';
+
+const SLOT_WIDTH = 40;
+const SLOT_HEIGHT = 30;
 
 const FC = 'rendering/flowchart';
 const CLS = 'rendering/class';
@@ -132,42 +137,74 @@ describe('compositor', () => {
     ]);
   });
 
-  it('composes a fixed-cell grid sized to the largest tile with title labels', async () => {
+  it('composes a fixed viewport cell grid with title labels', async () => {
     const paths = await collectScreenshots(dir);
     const [plan] = planSheets(paths, { tilesPerSheet: 12, cols: 3 });
-    const { buffer, manifest } = await composeSheet(plan, { inputDir: dir });
+    const slot = { tileWidth: SLOT_WIDTH, tileImageHeight: SLOT_HEIGHT };
+    const { buffer, manifest } = await composeSheet(plan, { inputDir: dir, ...slot });
     const meta = await sharp(buffer).metadata();
-    // cellWidth = max(20,10,40)=40, imageHeight=max(10,30,15)=30, label=24
-    expect(meta.width).toBe(120);
-    expect(meta.height).toBe(30 + LABEL_HEIGHT);
+    expect(meta.width).toBe(SLOT_WIDTH * 3);
+    expect(meta.height).toBe(SLOT_HEIGHT + LABEL_HEIGHT);
     expect(manifest.grid).toStrictEqual({
       cols: 3,
       rows: 1,
-      cellWidth: 40,
-      cellHeight: 30 + LABEL_HEIGHT,
-      imageHeight: 30,
+      cellWidth: SLOT_WIDTH,
+      cellHeight: SLOT_HEIGHT + LABEL_HEIGHT,
+      imageHeight: SLOT_HEIGHT,
       labelHeight: LABEL_HEIGHT,
       scale: 1,
     });
     expect(manifest.tiles[0]).toMatchObject({ name: 'a', title: 'a', row: 0, col: 0 });
   });
 
+  it('keeps grid dimensions when tile screenshot sizes differ', async () => {
+    const specDir = join(dir, 'rendering/flowchart/flowchart.spec.js');
+    const huge = await sharp({
+      create: { width: 200, height: 150, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } },
+    })
+      .png()
+      .toBuffer();
+    await writeFile(join(specDir, 'huge.png'), huge);
+
+    const slot = { tileWidth: SLOT_WIDTH, tileImageHeight: SLOT_HEIGHT };
+    const [smallPlan] = planSheets(['rendering/flowchart/flowchart.spec.js/a.png'], {
+      tilesPerSheet: 12,
+      cols: 3,
+    });
+    const [hugePlan] = planSheets(['rendering/flowchart/flowchart.spec.js/huge.png'], {
+      tilesPerSheet: 12,
+      cols: 3,
+    });
+
+    const small = await composeSheet(smallPlan, { inputDir: dir, ...slot });
+    const withHuge = await composeSheet(hugePlan, { inputDir: dir, ...slot });
+
+    expect(withHuge.manifest.grid).toStrictEqual(small.manifest.grid);
+  });
+
+  it('defaults to the Cypress viewport slot size', () => {
+    expect(DEFAULT_TILE_WIDTH).toBe(1440);
+    expect(DEFAULT_TILE_IMAGE_HEIGHT).toBe(1024);
+  });
+
   it('scales output dimensions when scale > 1', async () => {
-    const paths = await collectScreenshots(dir);
+    const paths = (await collectScreenshots(dir)).filter((p) => !p.endsWith('huge.png'));
     const [plan] = planSheets(paths, { tilesPerSheet: 12, cols: 3 });
-    const { buffer, manifest } = await composeSheet(plan, { inputDir: dir, scale: 2 });
+    const slot = { tileWidth: SLOT_WIDTH, tileImageHeight: SLOT_HEIGHT, scale: 2 as const };
+    const { buffer, manifest } = await composeSheet(plan, { inputDir: dir, ...slot });
     const meta = await sharp(buffer).metadata();
-    expect(meta.width).toBe(240);
-    expect(meta.height).toBe((30 + LABEL_HEIGHT) * 2);
+    expect(meta.width).toBe(SLOT_WIDTH * 3 * 2);
+    expect(meta.height).toBe((SLOT_HEIGHT + LABEL_HEIGHT) * 2);
     expect(manifest.grid.scale).toBe(2);
-    expect(manifest.grid.cellWidth).toBe(80);
+    expect(manifest.grid.cellWidth).toBe(SLOT_WIDTH * 2);
   });
 
   it('produces byte-identical output on re-run (determinism)', async () => {
-    const paths = await collectScreenshots(dir);
+    const paths = (await collectScreenshots(dir)).filter((p) => !p.endsWith('huge.png'));
     const [plan] = planSheets(paths, { tilesPerSheet: 12, cols: 3 });
-    const first = await composeSheet(plan, { inputDir: dir });
-    const second = await composeSheet(plan, { inputDir: dir });
+    const slot = { tileWidth: SLOT_WIDTH, tileImageHeight: SLOT_HEIGHT };
+    const first = await composeSheet(plan, { inputDir: dir, ...slot });
+    const second = await composeSheet(plan, { inputDir: dir, ...slot });
     expect(first.buffer.equals(second.buffer)).toBe(true);
   });
 });
