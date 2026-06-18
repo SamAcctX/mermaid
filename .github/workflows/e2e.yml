@@ -280,7 +280,8 @@ jobs:
 
       - name: Upload sheets to Argos
         env:
-          ARGOS_TOKEN: ${{ secrets.ARGOS_TOKEN }}
+          # Token for the Argos "mermaid-batched" project (composite sheets only).
+          ARGOS_TOKEN: ${{ secrets.ARGOS_MERMAID_BATCHED_TOKEN }}
           # Scoped runs captured only some folders; tell Argos this build is a
           # partial set so absent sheets are not treated as deletions.
           ARGOS_SUBSET: ${{ needs.detect-scope.outputs.spec_pattern != '' }}
