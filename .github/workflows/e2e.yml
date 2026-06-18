@@ -214,9 +214,6 @@ jobs:
           # e.g. if this action was run from a fork
           record: ${{ env.RUN_VISUAL_TEST == 'true' && secrets.CYPRESS_RECORD_KEY != '' }}
         env:
-          # For scoped runs (only a subset of specs executed), mark the Argos
-          # build as a "subset build".
-          ARGOS_SUBSET: "${{ needs.detect-scope.outputs.spec_pattern != '' }}"
           CYPRESS_COMMIT: ${{ github.sha }}
           CYPRESS_RECORD_KEY: ${{ env.RUN_VISUAL_TEST == 'true' && secrets.CYPRESS_RECORD_KEY || ''}}
           SPLIT: ${{ strategy.job-total }}

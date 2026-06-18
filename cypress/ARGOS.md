@@ -4,7 +4,7 @@ Per-test screenshots are captured during Cypress runs but **not** uploaded in-ru
 
 ## Pipeline
 
-1. **Capture** — `cy.argosScreenshot` writes PNGs to `cypress/screenshots/` with `uploadToArgos: false` (see `cypress.config.ts`).
+1. **Capture** — `cy.argosScreenshot` writes PNGs to `cypress/screenshots/.../argos/` (local only; no `registerArgosTask` / no in-run upload).
 2. **Batch** — `pnpm run argos:batch` groups screenshots by diagram folder, stable-sorts, chunks into fixed-tile sheets, and writes composites + JSON manifests to `cypress/argos-sheets/`.
 3. **Upload** — the `argos-batch` CI job runs `argos upload cypress/argos-sheets` (`ARGOS_SUBSET=true` for scoped runs).
 
