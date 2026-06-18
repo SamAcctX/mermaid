@@ -254,6 +254,11 @@ jobs:
       }}
     needs: [detect-scope, e2e]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Argos CLI authenticates via GitHub OIDC (or tokenless on fork PRs).
+      id-token: write
+      pull-requests: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -280,8 +285,8 @@ jobs:
 
       - name: Upload sheets to Argos
         env:
-          # Token for the Argos "mermaid-batched" project (composite sheets only).
-          ARGOS_TOKEN: ${{ secrets.ARGOS_MERMAID_BATCHED_TOKEN }}
+          # PR metadata for Argos checks/comments (OIDC handles auth — no ARGOS_TOKEN).
+          GITHUB_TOKEN: ${{ github.token }}
           # Scoped runs captured only some folders; tell Argos this build is a
           # partial set so absent sheets are not treated as deletions.
           ARGOS_SUBSET: ${{ needs.detect-scope.outputs.spec_pattern != '' }}
