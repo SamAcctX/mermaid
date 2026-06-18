@@ -32,15 +32,15 @@ pnpm run argos:batch
 
 ## Configuration
 
-| Env var                   | Default                | Description                         |
-| ------------------------- | ---------------------- | ----------------------------------- |
-| `ARGOS_SCREENSHOT_DIR`    | `cypress/screenshots`  | Input directory                     |
-| `ARGOS_SHEETS_DIR`        | `cypress/argos-sheets` | Output directory                    |
-| `ARGOS_TILES_PER_SHEET`   | `12`                   | Max tiles per composite sheet       |
-| `ARGOS_SHEET_COLS`        | `3`                    | Grid columns per sheet              |
+| Env var                   | Default                | Description                              |
+| ------------------------- | ---------------------- | ---------------------------------------- |
+| `ARGOS_SCREENSHOT_DIR`    | `cypress/screenshots`  | Input directory                          |
+| `ARGOS_SHEETS_DIR`        | `cypress/argos-sheets` | Output directory                         |
+| `ARGOS_TILES_PER_SHEET`   | `12`                   | Max tiles per composite sheet            |
+| `ARGOS_SHEET_COLS`        | `3`                    | Grid columns per sheet                   |
 | `ARGOS_SHEET_SCALE`       | `1`                    | Output scale (1 = native, 2 = 2× pixels) |
-| `ARGOS_TILE_WIDTH`        | `1440`                 | Fixed cell width (Cypress viewport) |
-| `ARGOS_TILE_IMAGE_HEIGHT` | `1024`                 | Fixed image slot height             |
+| `ARGOS_TILE_WIDTH`        | `1440`                 | Fixed cell width (Cypress viewport)      |
+| `ARGOS_TILE_IMAGE_HEIGHT` | `1024`                 | Fixed image slot height                  |
 
 CI upload uses GitHub Actions authentication (same as develop’s `registerArgosTask` path — no repo secret required). Every upload sets `ARGOS_SUBSET=true`.
 
