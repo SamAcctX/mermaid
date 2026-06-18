@@ -357,7 +357,14 @@ jobs:
           for i in $(seq 1 "$K"); do
             globs=()
             for j in "${!groups[@]}"; do
-              if [ $(( j % K + 1 )) -eq "$i" ]; then globs+=( "${groups[$j]}/**" ); fi
+              # Match only image files. A bare `<group>/**` also matches the
+              # `<name>.png.argos.json` metadata sidecars; Argos then treats each
+              # sidecar as a screenshot and reads `<sidecar>.argos.json`, doubling
+              # the suffix. For long screenshot names that path exceeds the 255-byte
+              # filename limit (ENAMETOOLONG), which Argos rethrows as
+              # "Failed to read metadata". Restricting to images avoids this and
+              # keeps the `.json` manifests / sidecars out of the upload entirely.
+              if [ $(( j % K + 1 )) -eq "$i" ]; then globs+=( "${groups[$j]}/**/*.{png,jpg,jpeg}" ); fi
             done
             [ ${#globs[@]} -eq 0 ] && continue
             npx argos upload cypress/argos-baseline \
