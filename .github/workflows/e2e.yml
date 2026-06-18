@@ -122,7 +122,7 @@ jobs:
               echo "[detect-scope] Manual run — scoped to: ${SPEC}"
             else
               echo "spec_pattern=" >> "$GITHUB_OUTPUT"
-              echo "matrix=[1,2,3,4,5]" >> "$GITHUB_OUTPUT"
+              echo "matrix=[1,2,3,4,5,6,7,8]" >> "$GITHUB_OUTPUT"
               echo "[detect-scope] Manual run — full suite."
             fi
             exit 0
@@ -133,7 +133,7 @@ jobs:
           # (where repository variables are unavailable) still benefit from it.
           if [ "${E2E_SCOPE_BY_DIAGRAM}" = "false" ]; then
             echo "spec_pattern=" >> "$GITHUB_OUTPUT"
-            echo "matrix=[1,2,3,4,5]" >> "$GITHUB_OUTPUT"
+            echo "matrix=[1,2,3,4,5,6,7,8]" >> "$GITHUB_OUTPUT"
             echo "[detect-scope] Scoping disabled via kill-switch — full suite."
             exit 0
           fi
@@ -144,7 +144,7 @@ jobs:
           # full suite (no PR diff to scope against).
           if [ "$BASE" = "develop" ] || [ "$BASE" = "master" ]; then
             echo "spec_pattern=" >> "$GITHUB_OUTPUT"
-            echo "matrix=[1,2,3,4,5]" >> "$GITHUB_OUTPUT"
+            echo "matrix=[1,2,3,4,5,6,7,8]" >> "$GITHUB_OUTPUT"
             echo "[detect-scope] Direct push to ${BASE} — full suite."
             exit 0
           fi
@@ -155,7 +155,7 @@ jobs:
 
           if [ -z "$MERGE_BASE" ]; then
             echo "spec_pattern=" >> "$GITHUB_OUTPUT"
-            echo "matrix=[1,2,3,4,5]" >> "$GITHUB_OUTPUT"
+            echo "matrix=[1,2,3,4,5,6,7,8]" >> "$GITHUB_OUTPUT"
             echo "[detect-scope] Could not determine merge-base — full suite."
             exit 0
           fi
@@ -178,7 +178,7 @@ jobs:
             echo "[detect-scope] Scoped to: ${SPEC}"
           else
             echo "spec_pattern=" >> "$GITHUB_OUTPUT"
-            echo "matrix=[1,2,3,4,5]" >> "$GITHUB_OUTPUT"
+            echo "matrix=[1,2,3,4,5,6,7,8]" >> "$GITHUB_OUTPUT"
             echo "[detect-scope] Cannot scope — full suite."
           fi
           echo "[detect-scope] matrix output: $(grep '^matrix=' "$GITHUB_OUTPUT" | tail -1)"
