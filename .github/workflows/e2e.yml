@@ -382,7 +382,7 @@ jobs:
           # Round-robin the top-level diagram-group folders into K buckets so each
           # upload's finalize body carries metadata for only ~1/K of the suite.
           mapfile -t groups < <(cd cypress/argos-baseline && ls -d */ | sed 's#/##')
-          K=3
+          K=5
           for i in $(seq 1 "$K"); do
             globs=()
             for j in "${!groups[@]}"; do
