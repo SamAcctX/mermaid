@@ -24,6 +24,7 @@ classdef
 classdefid
 classentity
 classname
+clazz
 CODEOWNERS
 COLONSEP
 COMPOSIT_STATE
