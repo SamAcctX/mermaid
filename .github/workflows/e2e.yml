@@ -317,6 +317,12 @@ jobs:
   # upload them to Argos in a single build. PR / merge-queue runs upload only the
   # sheets; a push to develop additionally uploads the individual screenshots so
   # the baseline is a superset (see ARGOS_UPLOAD_BOTH).
+  #
+  # Only runs when the e2e matrix fully succeeded: a failed/partial e2e run would
+  # otherwise upload an incomplete or wrong set of screenshots — and on develop
+  # that set becomes the baseline. `needs.e2e.result == 'success'` requires every
+  # shard to pass (the matrix is fail-fast: false, so its result is failure if any
+  # shard failed).
   argos-batch:
     if: >-
       ${{
@@ -324,7 +330,7 @@ jobs:
         (github.event_name == 'workflow_dispatch' ||
           (github.event_name != 'pull_request' || !startsWith(github.head_ref, 'renovate/'))) &&
         needs.detect-scope.outputs.spec_pattern != 'SKIP' &&
-        !cancelled()
+        needs.e2e.result == 'success'
       }}
     needs: [detect-scope, e2e]
     runs-on: ubuntu-latest
