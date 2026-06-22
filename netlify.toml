@@ -16,3 +16,12 @@
 
   # Default build command.
   command = "./scripts/editor.bash"
+
+[build.environment]
+  # `scripts/editor.bash` clones and builds the Mermaid Live Editor, which
+  # requires Node >=24.16.0 (see mermaid-live-editor/.node-version). That is
+  # newer than the repo's root `.node-version` (used by the rest of CI), and
+  # Netlify would otherwise fall back to an incompatible default, failing the
+  # live editor's `pnpm install` with ERR_PNPM_UNSUPPORTED_ENGINE. Pin the
+  # deploy-preview build to a compatible version. This only affects Netlify.
+  NODE_VERSION = "24.16.0"
