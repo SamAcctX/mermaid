@@ -1,4 +1,4 @@
-import { imgSnapshotTest, renderGraph } from '../../../helpers/util.ts';
+import { imgSnapshotTest } from '../../../helpers/util.ts';
 
 describe('XY Chart', () => {
   it('should render the simplest possible xy-beta chart', () => {
@@ -91,6 +91,27 @@ describe('XY Chart', () => {
       `,
       {}
     );
+  });
+  it('should render legends for named plots', () => {
+    imgSnapshotTest(
+      `
+      xychart-beta
+        title "An Example Chart"
+        x-axis ["90d", "60d", "30d", "7d", "1d", "Current"]
+        y-axis "Seconds" 0 --> 198.2
+        line "avg" [48.1, 41.5, 45.7, 72.8, 67.7, 59.9]
+        line "p50" [38.2, 36.8, 39.7, 54.5, 49.0, 38.4]
+        bar "p95" [112.2, 75.3, 103.0, 177.0, 180.2, 109.4]
+      `,
+      {}
+    );
+
+    cy.get('g.legend text').should('have.length', 3);
+    cy.get('g.legend').should('contain.text', 'avg');
+    cy.get('g.legend').should('contain.text', 'p50');
+    cy.get('g.legend').should('contain.text', 'p95');
+    cy.get('g.legend path').should('have.length', 2);
+    cy.get('g.legend rect').should('have.length', 1);
   });
   it('Decimals and negative numbers are supported', () => {
     imgSnapshotTest(
@@ -877,6 +898,81 @@ describe('XY Chart', () => {
             );
           });
       });
+    });
+  });
+
+  it('should render xy-chart with rotated label on x-axis', () => {
+    imgSnapshotTest(
+      `
+    ---
+    config:
+      xyChart:
+        xAxis:
+          showLabel: true
+          labelRotation: 45
+    ---
+    xychart
+      title "Git Commits per Month"
+      x-axis "Date" [ 2023-04, 2023-05, 2023-06, 2023-07, 2023-08, 2023-09, 2023-10, 2023-11, 2023-12, 2024-01, 2024-02, 2024-03, 2024-04, 2024-05, 2024-06, 2024-07, 2024-08, 2024-09, 2024-10 ]
+      y-axis "Number of Commits"
+      bar    [ 344, 523, 81, 7, 3, 3, 5, 17, 5, 2, 7, 6, 4, 2, 9, 31, 79, 70, 50 ]
+    `,
+      {}
+    );
+
+    cy.get('g.bottom-axis > g.label > text').each(($text) => {
+      const transform = $text.attr('transform');
+      expect(transform).to.contains('rotate(45)');
+    });
+  });
+
+  it('should render xy-chart with normal rotation on x-axis when labelRotation value is greater than limit', () => {
+    imgSnapshotTest(
+      `
+    ---
+    config:
+      xyChart:
+        xAxis:
+          showLabel: true
+          labelRotation: 120
+    ---
+    xychart
+      title "Items Sold"
+      x-axis "Item" [ Monitor, Mouse, Keyboard ]
+      y-axis "Number of Sales"
+      bar    [ 51, 72, 36 ]
+    `,
+      {}
+    );
+
+    cy.get('g.bottom-axis > g.label > text').each(($text) => {
+      const transform = $text.attr('transform');
+      expect(transform).to.contains('rotate(0)');
+    });
+  });
+
+  it('should render xy-chart with normal rotation on x-axis when labelRotation value is less than limit', () => {
+    imgSnapshotTest(
+      `
+    ---
+    config:
+      xyChart:
+        xAxis:
+          showLabel: true
+          labelRotation: -100
+    ---
+    xychart
+      title "Items Sold"
+      x-axis "Item" [ Monitor, Mouse, Keyboard ]
+      y-axis "Number of Sales"
+      bar    [ 51, 72, 36 ]
+    `,
+      {}
+    );
+
+    cy.get('g.bottom-axis > g.label > text').each(($text) => {
+      const transform = $text.attr('transform');
+      expect(transform).to.contains('rotate(0)');
     });
   });
 
