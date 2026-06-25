@@ -1,10 +1,18 @@
 import type { TreeViewDiagramConfig } from '../../config.type.js';
 import type { DiagramRenderer, DrawDefinition } from '../../diagram-api/types.js';
 import { log } from '../../logger.js';
+import { getIconSVG, registerIconPacks } from '../../rendering-util/icons.js';
 import { selectSvgElement } from '../../rendering-util/selectSvgElement.js';
 import { configureSvgSize } from '../../setupGraphViewbox.js';
-import { ICON_PATHS } from './icons.js';
+import { getNodeIcon, treeViewIcons } from './icons.js';
 import type { D3SVGElement, Node, TreeViewDB } from './types.js';
+
+registerIconPacks([
+  {
+    name: treeViewIcons.prefix,
+    icons: treeViewIcons,
+  },
+]);
 
 const ICON_SIZE = 14;
 const ICON_GAP = 4;
@@ -17,28 +25,47 @@ interface RenderInfo {
   centerY: number;
 }
 
+/** Iconify names may contain `:` (pack:name) which is unsafe in url(#…) references */
+const iconSymbolId = (diagramId: string, icon: string) =>
+  `tv-icon-${diagramId}-${icon.replace(/[^\w-]/g, '-')}`;
+
 /**
- * Inject <defs> with all referenced icon symbols into the SVG.
+ * Inject <defs> with all referenced icons into the SVG.
+ * Each icon is resolved once through the iconify pipeline and referenced
+ * per row via <use>, instead of repeating the icon markup for every node.
  */
-const injectIconDefs = (svg: D3SVGElement<SVGSVGElement>, root: Node, diagramId: string) => {
+const injectIconDefs = async (
+  svg: D3SVGElement<SVGSVGElement>,
+  root: Node,
+  config: Required<TreeViewDiagramConfig>,
+  diagramId: string
+) => {
   const usedIcons = new Set<string>();
   const collect = (node: Node) => {
-    if (node.iconId && node.iconId !== 'none') {
-      usedIcons.add(node.iconId);
+    const icon = getNodeIcon(node, config);
+    if (icon) {
+      usedIcons.add(icon);
     }
     node.children.forEach(collect);
   };
   collect(root);
+  if (usedIcons.size === 0) {
+    return;
+  }
+
+  const iconSVGs = await Promise.all(
+    [...usedIcons].map(async (icon) => ({
+      icon,
+      svg: await getIconSVG(icon, {
+        height: ICON_SIZE,
+        width: ICON_SIZE,
+      }),
+    }))
+  );
 
   const defs = svg.append('defs');
-  for (const iconId of usedIcons) {
-    const path = ICON_PATHS[iconId] ?? ICON_PATHS.file;
-    defs
-      .append('symbol')
-      .attr('id', `tv-icon-${diagramId}-${iconId}`)
-      .attr('viewBox', '0 0 24 24')
-      .append('path')
-      .attr('d', path);
+  for (const { icon, svg: iconSVG } of iconSVGs) {
+    defs.append('g').attr('id', iconSymbolId(diagramId, icon)).html(iconSVG);
   }
 };
 
@@ -59,17 +86,16 @@ const positionLabel = (
     cssClasses += ` ${node.cssClass}`;
   }
 
-  // Icon — skip if iconId is 'none' or showIcons is disabled
+  // Explicit icon() annotations always render; defaults only when showIcons is on
   const iconOffset = ICON_SIZE + ICON_GAP;
-  const showIcon = config.showIcons !== false && node.iconId && node.iconId !== 'none';
-  if (showIcon) {
+  const icon = getNodeIcon(node, config);
+  const showIcon = icon !== undefined;
+  if (icon) {
     nodeGroup
       .append('use')
-      .attr('xlink:href', `#tv-icon-${diagramId}-${node.iconId}`)
+      .attr('xlink:href', `#${iconSymbolId(diagramId, icon)}`)
       .attr('x', x + config.paddingX)
       .attr('y', y + config.paddingY)
-      .attr('width', ICON_SIZE)
-      .attr('height', ICON_SIZE)
       .attr('class', 'treeView-node-icon');
   }
 
@@ -210,7 +236,7 @@ const drawTree = (
   return { totalHeight, totalWidth };
 };
 
-const draw: DrawDefinition = (text, id, _ver, diagObj) => {
+const draw: DrawDefinition = async (text, id, _ver, diagObj) => {
   log.debug('Rendering treeView diagram\n' + text);
 
   const db = diagObj.db as TreeViewDB;
@@ -220,9 +246,7 @@ const draw: DrawDefinition = (text, id, _ver, diagObj) => {
   const svg = selectSvgElement(id);
 
   // Inject icon definitions (scoped to diagramId to avoid duplicates)
-  if (config.showIcons !== false) {
-    injectIconDefs(svg, root, id);
-  }
+  await injectIconDefs(svg, root, config, id);
 
   const treeElem = svg.append('g');
   treeElem.attr('class', 'tree-view');
