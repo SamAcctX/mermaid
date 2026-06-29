@@ -8,6 +8,13 @@ import 'dotenv/config';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+const SWIMLANE_FIXTURE_DIR = 'cypress/platform/dev-diagrams/layout-tests/swimlanes';
+
+const listSwimlaneFixtureNames = (projectRoot: string): string[] =>
+  readdirSync(join(projectRoot, SWIMLANE_FIXTURE_DIR))
+    .filter((file) => file.endsWith('.mmd'))
+    .sort();
+
 export default eyesPlugin(
   defineConfig({
     projectId: 'n2sma2',
@@ -54,6 +61,7 @@ export default eyesPlugin(
         // copy any needed variables from process.env to config.env
         config.env.useAppli = process.env.USE_APPLI ? true : false;
         config.env.useArgos = process.env.RUN_VISUAL_TEST === 'true';
+        config.env.swimlaneFixtures = listSwimlaneFixtureNames(config.projectRoot);
 
         // Argos capture uses cy.argosScreenshot from @argos-ci/cypress/support (e2e.js).
         // Do not register registerArgosTask — its after:run hook uploads to Argos.
@@ -63,11 +71,7 @@ export default eyesPlugin(
         }
         on('task', {
           listSwimlaneFixtures() {
-            return readdirSync(
-              join(config.projectRoot, 'cypress/platform/dev-diagrams/layout-tests/swimlanes')
-            )
-              .filter((file) => file.endsWith('.mmd'))
-              .sort();
+            return listSwimlaneFixtureNames(config.projectRoot);
           },
         });
         // do not forget to return the changed config object!
